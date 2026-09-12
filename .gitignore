@@ -37,3 +37,5 @@ temp/
 
 # model/runtime artifacts that should not be committed by default
 *.onnx.data
+/AGENTS.md
+/.agents/
