@@ -27,7 +27,7 @@ export class WebEyeTrackProvider implements GazeProvider {
   private readonly allowRemoteAssets: boolean;
 
   constructor(options: WebEyeTrackProviderOptions = {}) {
-    this.allowRemoteAssets = options.allowRemoteAssets ?? import.meta.env.VITE_ALLOW_REMOTE_MODEL_ASSETS === "true";
+    this.allowRemoteAssets = options.allowRemoteAssets ?? (import.meta.env.DEV || import.meta.env.VITE_ALLOW_REMOTE_MODEL_ASSETS === "true");
   }
 
   async initialize(video: HTMLVideoElement): Promise<void> {

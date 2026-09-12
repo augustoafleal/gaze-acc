@@ -88,7 +88,7 @@ Tracking loss is accumulated from observation timestamps and divided by active e
 
 The application provides an `Experimento guiado` mode for a person to run with a real webcam. Codex does not execute this physical evaluation and must not generate or submit experimental results.
 
-Active gaze sessions use a fixed landscape viewport. Scrolling is disabled on `html`, `body` and `#root`; status/instruction content is constrained to a fixed-height region and cannot push the interaction region. Portrait blocks the start of calibration or active communication. Any resize, orientation change or DPR change during an active session invalidates the calibration and cancels the current dwell rather than repositioning the targets silently.
+Active gaze sessions use a fixed viewport in either portrait or landscape. Scrolling is disabled on `html`, `body` and `#root`; status/instruction content is constrained to a fixed-height region and cannot push the interaction region. Orientation is not a start-up requirement. A resize or orientation change during an active session does not show an interruption or end the session; the current dwell is reset silently and the targets use the current viewport. The user may manually use `Recalibrar` after a large geometry change if drift is observed.
 
 The guided flow is:
 
@@ -108,19 +108,42 @@ During the formal session the gaze cursor is disabled and accuracy is not shown.
 
 The export schema is versioned (`schemaVersion: "1.0"`) and includes accuracy by target, latency quartiles, temporal blocks (1–20, 21–40, 41–60 and 61–80), and a confusion matrix derived only from main trials.
 
+## Blink navigation experiment
+
+Blink navigation is the default interaction of the app (see `docs/product.md`); the dwell/calibration interface is preserved at `?legacy=1` for reference.
+
+Blink navigation starts camera tracking without the 9-point spatial calibration. Only a result with usable facial landmarks may produce `EyeObservation.state = "open"` or `"closed"`; otherwise it is `unavailable` and cannot create a gesture. The temporal detector requires `OPEN -> CLOSED -> OPEN`, ignores natural closures below its configured minimum, delays short gestures during the double window, and emits long only after reopening. A double requires the second blink to **start** within the double window; the second blink may finish after the deadline. The deadline never resolves the first `short` while the second closure is in progress. A second closure too short for `minIntentionalBlinkMs` cancels the gesture without a command, and a second closure at or above `longBlinkThresholdMs` emits only `long`. Tracking loss cancels any pending short or in-progress closure without emitting a command. An optional `stateStabilityMs` debounces `open`/`closed` transitions without inflating measured durations; `unavailable` is never debounced.
+
+The current defaults are 120 ms minimum intentional closure, 700 ms long threshold, 450 ms double window, 800 ms cooldown, 5,000 ms maximum closure and 0 ms state stabilization. These are experimental defaults, not clinically or physiologically validated values. Debug is off by default and may export local derived timing events; no frames, video, landmarks or remote telemetry are recorded.
+
+The navigation mapping is circular: short = next, double short = previous, and long = select the highlighted concept. The initial highlight is `SIM`.
+
+Before using blink navigation as AAC interaction, run the human blink test with a real person and webcam, covering natural blink, intentional short, intentional double and intentional long closures. The implementation alone is not evidence of blink usability, pediatric suitability, Android support or clinical reliability.
+
+## Blink UI validation
+
+The blink UI follows a fixed shell: `position: fixed`, full viewport at `100dvh`, no browser scroll, and a docked 2×2 board. Validation must confirm:
+
+- both portrait and landscape are allowed at start, including phone-sized viewports; no viewport-size or orientation overlay may suspend blink interaction;
+- the four target rectangles (`SIM`, `NÃO`, `ÁGUA`, `DOR`) are geometrically invariant between the 1280×800, 1024×600 and 844×390 reference viewports (differences below 1 px are acceptable);
+- the debug overlay, when enabled, does not change target geometry or readability;
+- the focus indicator is visible on all four targets independently of color;
+- speech fires exactly once per long blink;
+- the exit action is operator-controlled and cannot be triggered by blink gestures;
+- the diagnostic export remains local and contains only derived events.
+
 ## UI checklist
 
 For UI changes, manually inspect at minimum:
 
-- [ ] targets remain large enough for gaze interaction;
-- [ ] spacing reduces accidental neighboring selection;
-- [ ] `SIM` and `NÃO` remain obvious and reachable where applicable;
-- [ ] dwell progress is visible;
+- [ ] targets remain large and stable during the session;
+- [ ] `SIM` and `NÃO` remain obvious and reachable;
+- [ ] the focus indicator is visible without relying on color alone;
 - [ ] confirmation is visually clear;
-- [ ] gaze loss does not accidentally confirm;
-- [ ] interface does not rely on color alone;
-- [ ] text is legible;
+- [ ] gaze/tracking loss does not accidentally confirm and preserves focus;
 - [ ] no distracting motion was introduced;
+- [ ] text is legible;
+- [ ] portrait and small viewports do not block the board;
 - [ ] layout works at the current Android-tablet test viewport;
 - [ ] layout works at the current Linux-notebook test viewport;
 - [ ] touch/mouse testing remains possible if applicable.

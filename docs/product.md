@@ -4,9 +4,13 @@
 
 Provide a simple AAC interface controlled by gaze estimated from the device's front-facing camera.
 
-The intended interaction is:
+The current intended interaction is camera-derived eye state with sequential target navigation:
 
-look -> dwell -> select -> compose or speak
+- short blink -> advance the highlight (`Próximo`);
+- double short blink -> move back (`Anterior`);
+- long blink -> select and speak.
+
+This avoids spatial calibration entirely, which is a hard requirement for unsupervised family use. Point-of-gaze with dwell (`look -> dwell -> select`) was the earlier prototype; it remains implemented and reachable with `?legacy=1` for reference, but the product path is blink navigation. Neither mode is empirically validated yet.
 
 The application should work on ordinary consumer devices without specialized eye-tracking hardware.
 
@@ -37,20 +41,20 @@ These are experimental targets for validating interaction, not a final vocabular
 - large targets;
 - stable target positions;
 - generous spacing;
-- clear dwell progress;
+- a persistent, non-color-only focus indicator;
 - clear confirmation after selection;
 - strong legibility;
 - calm, child-friendly visual language;
 - no unnecessary motion;
 - no dependence on color alone;
-- graceful behavior when gaze is lost;
+- graceful behavior when gaze is lost (focus preserved, commands suspended);
 - accidental selections should be minimized.
 
 ## Product stages
 
 ### Stage 0 — technical gaze experiment
 
-Prove that camera-based gaze can distinguish four large screen regions with acceptable reliability.
+Prove that blink transitions (`open`/`closed`) can control a four-target selection loop with acceptable reliability, using precise thresholds for short/double/long and a clear tracking-loss fallback. Historical note: camera-based point-of-gaze also distinguishes four large screen regions with dwell, as preserved in the legacy interface.
 
 ### Stage 1 — minimal communication board
 

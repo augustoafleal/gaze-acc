@@ -74,9 +74,19 @@ WebEyeTrack 0.0.2 does not provide semantic confidence. Its adapter does not inv
 
 The adapter discards WebEyeTrack's video-time timestamp (seconds) at the boundary. Session, dwell, calibration and tracking-duration timestamps use the same monotonic millisecond clock.
 
-Setup UI and active-session UI are separate layout modes. During calibration, warm-up, formal trials, neutral windows and free camera communication, the active shell occupies a fixed landscape `100dvh` viewport with scrolling disabled. Its instruction/status region has a fixed height and its interaction region contains the calibration field or four targets. A meaningful resize, orientation change or DPR change invalidates the active calibration instead of silently moving the targets.
+Setup UI and active-session UI are separate layout modes. The legacy dwell interface (calibration, guided experiment, free camera communication) uses an active shell occupying a fixed `100dvh` viewport with scrolling disabled; portrait and landscape are both allowed, and a resize or orientation change never interrupts the session. The current blink interface uses its own fixed shell (`position: fixed`, `100dvh`, no scroll) with a docked 2×2 board; phones, tablets and notebooks are supported in both orientations without a minimum-viewport lock. A resize or orientation change preserves the session and highlighted target while cancelling only a pending temporal blink gesture.
 
 The gaze coordinate contract remains the full CSS viewport: `(0, 0)` is the viewport top-left and `(1, 1)` is the viewport bottom-right. Calibration points are drawn inside the fixed interaction region and explicitly mapped from that region into full-viewport coordinates before being passed to WebEyeTrack. Target hit-testing uses CSS-pixel rectangles in the same full-viewport space; `devicePixelRatio` is metadata, not an extra scale factor.
+
+The current blink interface is a separate camera path from point-of-gaze/dwell:
+
+```text
+WebEyeTrack -> EyeObservation -> BlinkGestureDetector -> BlinkNavigationController -> AAC UI -> Speech
+```
+
+It uses WebEyeTrack only for `facialLandmarks` presence and the `gazeState` eye-state signal. It does not use point-of-gaze, calibration, target hit-testing, gaze cursor or dwell. `EyeObservation` has `state: "open" | "closed" | "unavailable"` and a monotonic `timestampMs`; a closed state is accepted only when facial landmarks are usable. Missing landmarks, invalid results and provider errors become `unavailable`.
+
+The AAC layer consumes eye observations through `BlinkAACSessionController` (`src/communication/blink-session.ts`), which owns the gesture detector, blink navigation, the command queue and diagnostic events; the UI never touches WebEyeTrack internals. The legacy point-of-gaze/dwell pipeline remains at `?legacy=1` for reference.
 
 ## Modules
 
@@ -115,6 +125,10 @@ Receives gaze/interaction state and renders dwell/selection feedback.
 
 Owns speech synthesis integration and graceful failure behavior.
 
+### Blink interaction
+
+`src/gaze/blink-gesture.ts` contains the provider-independent temporal detector. It waits for `OPEN -> CLOSED -> OPEN`, ignores closures below the configured intentional minimum, delays a short gesture during the double-blink window, and emits long only after reopening. The double window is satisfied when the second closure **starts** inside it; the deadline never resolves the first short while the second closure is in progress, and long takes precedence when the second blink is long. `src/communication/blink-navigation.ts` maps `short`, `double` and `long` to circular next, previous and select commands without knowing WebEyeTrack internals.
+
 ## Interaction boundary
 
 The interaction layer should transform gaze samples into semantic target events.
@@ -140,7 +154,7 @@ Exact values must be configurable and validated empirically.
 
 ## Offline direction
 
-The application is not a complete PWA yet. The WebEyeTrack BlazeGaze TensorFlow.js manifest and shard required at `/web/model.json` are bundled under `public/web/` from a pinned upstream commit. The package still hardcodes remote MediaPipe WASM and Face Landmarker model URLs, so remote model loading is opt-in for development via `VITE_ALLOW_REMOTE_MODEL_ASSETS=true`. The BlazeGaze files have no separate license file in the inspected upstream path and require redistribution review; the app does not claim to be fully offline/self-contained.
+The application is not a complete PWA yet. The WebEyeTrack BlazeGaze TensorFlow.js manifest and shard required at `${VITE_BASE_PATH}/web/model.json` (default: `/web/model.json`) are bundled under `public/web/` from a pinned upstream commit. The package still hardcodes remote MediaPipe WASM and Face Landmarker model URLs, so remote model loading is enabled automatically in development and remains opt-in for production builds via `VITE_ALLOW_REMOTE_MODEL_ASSETS=true`. The BlazeGaze files have no separate license file in the inspected upstream path and require redistribution review; the app does not claim to be fully offline/self-contained.
 
 Camera inference should run locally by default.
 
