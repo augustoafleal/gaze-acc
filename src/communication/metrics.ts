@@ -86,7 +86,7 @@ export function summarize(values: number[]): NumericSummary {
   };
 }
 
-const CONCEPT_IDS: ConceptId[] = ["sim", "nao", "agua", "dor"];
+const CONCEPT_IDS: ConceptId[] = ["sim", "nao", "virar", "dor"];
 
 export type ConfusionMatrix = Record<ConceptId, Record<ConceptId | "timeout", number>>;
 

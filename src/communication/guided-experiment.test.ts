@@ -28,8 +28,8 @@ describe("guided experiment", () => {
     for (const [index, sequence] of sequences.entries()) {
       const expectedPerTarget = index === 0 ? 2 : 20;
       expect(sequence).toHaveLength(expectedPerTarget * 4);
-      expect(new Set(sequence)).toEqual(new Set(["sim", "nao", "agua", "dor"]));
-      for (const target of ["sim", "nao", "agua", "dor"] as const) {
+      expect(new Set(sequence)).toEqual(new Set(["sim", "nao", "virar", "dor"]));
+      for (const target of ["sim", "nao", "virar", "dor"] as const) {
         expect(sequence.filter((item) => item === target)).toHaveLength(expectedPerTarget);
       }
       let run = 1;

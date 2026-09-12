@@ -138,7 +138,7 @@ Four large targets:
 ```text
 SIM       NÃO
 
-ÁGUA      DOR
+VIRAR     DOR
 ```
 
 Suggested initial protocol:

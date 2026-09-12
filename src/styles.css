@@ -55,7 +55,7 @@ h2 { font-size: clamp(1.4rem, 3vw, 2rem); margin-bottom: 0.7rem; }
 .board { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(10rem, 1fr)); gap: clamp(0.8rem, 2vw, 1.8rem); min-height: min(72vh, 760px); padding: clamp(0.5rem, 2vw, 1.5rem); }
 .concept-target { position: relative; display: grid; place-items: center; min-height: 10rem; overflow: hidden; border: 0.25rem solid transparent; border-radius: clamp(1.4rem, 4vw, 3rem); color: #263238; box-shadow: 0 0.7rem 1.4rem #51412a16; transition: border-color 120ms ease, box-shadow 120ms ease; }
 .concept-target span:first-child { position: relative; z-index: 1; font-size: clamp(2.2rem, 8vw, 6rem); font-weight: 800; letter-spacing: 0.03em; }
-.target-sim { background: #cfe8d8; } .target-nao { background: #f3d0c7; } .target-agua { background: #cfe4f2; } .target-dor { background: #f1e3b8; }
+.target-sim { background: #cfe8d8; } .target-nao { background: #f3d0c7; } .target-virar { background: #cfe4f2; } .target-dor { background: #f1e3b8; }
 .concept-target.is-candidate { border-color: #263238; box-shadow: 0 0 0 0.3rem #fff, 0 0.8rem 1.5rem #51412a24; }
 .concept-target.is-selected { border-color: #397a69; }
 .dwell-progress { position: absolute; z-index: 0; left: 0; bottom: 0; width: 100%; height: 0.65rem; transform-origin: left; background: #397a69; }
