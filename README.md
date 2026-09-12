@@ -25,7 +25,7 @@ The default application is a single-purpose blink communicator for the human tes
 
 - start screen that explains the three gestures;
 - camera session with optional blink training;
-- four large, fixed targets: `SIM`, `NÃO`, `ÁGUA`, `DOR`;
+- four large, fixed targets: `SIM`, `NÃO`, `VIRAR`, `DOR`;
 - short blink = next, double short blink = previous, long blink = select;
 - dwell selection is replaced by a long blink, but the underlying dwell and blink gesture modules remain in the repository;
 - TTS speech output exactly once per selection;

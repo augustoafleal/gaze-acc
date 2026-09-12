@@ -22,7 +22,7 @@ export const GUIDED_DEFAULTS = {
   interTrialNeutralMs: 1_200,
 };
 
-const TARGETS: ConceptId[] = ["sim", "nao", "agua", "dor"];
+const TARGETS: ConceptId[] = ["sim", "nao", "virar", "dor"];
 
 export type GuidedTrialPlan = {
   phase: "warmup" | "main";

@@ -215,7 +215,7 @@ describe("BlinkAACApp session flow", () => {
       window.dispatchEvent(new Event("resize"));
     });
     expect(screen.queryByText(/Tela pequena demais/)).toBeNull();
-    expect(screen.getAllByRole("button", { name: /^(SIM|NÃO|ÁGUA|DOR)$/ }).length).toBe(4);
+    expect(screen.getAllByRole("button", { name: /^(SIM|NÃO|VIRAR|DOR)$/ }).length).toBe(4);
 
     blink(provider, [["open", 50_000], ["closed", 50_300]]);
     act(() => window.dispatchEvent(new Event("orientationchange")));

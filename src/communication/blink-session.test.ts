@@ -118,7 +118,7 @@ describe("BlinkAACSessionController", () => {
   });
 
   it("exposes concept labels and speech text", () => {
-    expect(conceptLabel("agua")).toBe("ÁGUA");
+    expect(conceptLabel("virar")).toBe("VIRAR");
     expect(conceptSpeech("dor")).toBe("Dor");
   });
 });

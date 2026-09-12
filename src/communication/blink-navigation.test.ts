@@ -7,7 +7,7 @@ describe("BlinkNavigationController", () => {
     const controller = new BlinkNavigationController();
     expect(controller.currentTarget).toBe("sim");
     expect(controller.handleGesture("short")).toMatchObject({ command: "next", target: "nao" });
-    expect(controller.handleGesture("short")).toMatchObject({ command: "next", target: "agua" });
+    expect(controller.handleGesture("short")).toMatchObject({ command: "next", target: "virar" });
     expect(controller.handleGesture("double")).toMatchObject({ command: "previous", target: "nao" });
     expect(controller.handleGesture("double")).toMatchObject({ command: "previous", target: "sim" });
     expect(controller.handleGesture("double")).toMatchObject({ command: "previous", target: "dor" });

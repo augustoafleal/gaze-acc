@@ -31,7 +31,7 @@ Initial quick concepts:
 
 - `SIM`
 - `NÃO`
-- `ÁGUA`
+- `VIRAR`
 - `DOR`
 
 These are experimental targets for validating interaction, not a final vocabulary design.

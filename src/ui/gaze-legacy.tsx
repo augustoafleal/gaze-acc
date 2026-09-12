@@ -70,7 +70,7 @@ export function GazeAACApp() {
   const blinkEventsRef = useRef<BlinkDiagnosticEvent[]>([]);
   const blinkSessionIdRef = useRef<string | null>(null);
   const blinkStartedAtRef = useRef<string | null>(null);
-  const targetRefs = useRef<Record<ConceptId, HTMLButtonElement | null>>({ sim: null, nao: null, agua: null, dor: null });
+  const targetRefs = useRef<Record<ConceptId, HTMLButtonElement | null>>({ sim: null, nao: null, virar: null, dor: null });
   const dwellRef = useRef(new DwellController(DEFAULT_DWELL_CONFIG));
   const loggerRef = useRef(new ExperimentLogger("WebEyeTrack 0.0.2", DEFAULT_DWELL_CONFIG, null));
   const guidedRef = useRef<GuidedExperimentSession | null>(null);

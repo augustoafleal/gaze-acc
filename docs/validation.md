@@ -55,7 +55,7 @@ Targets:
 
 - `SIM`
 - `NÃO`
-- `ÁGUA`
+- `VIRAR`
 - `DOR`
 
 Protocol target:
@@ -125,7 +125,7 @@ Before using blink navigation as AAC interaction, run the human blink test with 
 The blink UI follows a fixed shell: `position: fixed`, full viewport at `100dvh`, no browser scroll, and a docked 2×2 board. Validation must confirm:
 
 - both portrait and landscape are allowed at start, including phone-sized viewports; no viewport-size or orientation overlay may suspend blink interaction;
-- the four target rectangles (`SIM`, `NÃO`, `ÁGUA`, `DOR`) are geometrically invariant between the 1280×800, 1024×600 and 844×390 reference viewports (differences below 1 px are acceptable);
+- the four target rectangles (`SIM`, `NÃO`, `VIRAR`, `DOR`) are geometrically invariant between the 1280×800, 1024×600 and 844×390 reference viewports (differences below 1 px are acceptable);
 - the debug overlay, when enabled, does not change target geometry or readability;
 - the focus indicator is visible on all four targets independently of color;
 - speech fires exactly once per long blink;

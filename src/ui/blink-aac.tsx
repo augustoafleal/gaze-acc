@@ -291,7 +291,7 @@ export function BlinkAACApp({
           </header>
 
           <div className="blink-board">
-            {(["sim", "nao", "agua", "dor"] as const).map((id) => (
+            {(["sim", "nao", "virar", "dor"] as const).map((id) => (
               <button
                 key={id}
                 className={`concept-target target-${id} ${focused === id ? "is-blink-focused" : ""} ${selected === id ? "is-selected" : ""}`}
