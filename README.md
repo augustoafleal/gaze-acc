@@ -61,7 +61,7 @@ The experiment exports its in-memory session as JSON and does not send data to a
 
 ## Deploy to GitHub Pages
 
-Pushes to `main` run the GitHub Pages workflow after typecheck, lint, tests, and a production build. In the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions**. The expected project-site URL is `https://<owner>.github.io/<repo>/`.
+Pushes to `main` run the GitHub Pages workflow after typecheck, lint, tests, and a production build. In the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions**. The live project site is `https://augustoafleal.github.io/gaze-acc/`.
 
 The published build enables WebEyeTrack's remote model assets and uses its repository subpath for local bundled model files. This phase is a standard HTTPS web deployment, not a PWA: it does not add a service worker, manifest, or offline cache.
 
