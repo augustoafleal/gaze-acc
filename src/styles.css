@@ -1,0 +1,119 @@
+:root { --session-header-height: 4.5rem; --session-instruction-height: 6.5rem; --session-footer-height: 3rem; font-family: Nunito, ui-rounded, system-ui, sans-serif; color: #263238; background: #f7f4ee; font-synthesis: none; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: wait; opacity: 0.65; }
+.app-shell { min-height: 100vh; padding: clamp(1rem, 3vw, 2.5rem); }
+.camera-source { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.app-header, .experiment-toolbar { display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
+.app-header { max-width: 1180px; margin: 0 auto 1.5rem; }
+.eyebrow { margin: 0 0 0.3rem; color: #68777d; font-size: 0.78rem; letter-spacing: 0.11em; text-transform: uppercase; }
+h1, h2, p { margin-top: 0; }
+h1 { margin-bottom: 0; font-size: clamp(1.6rem, 3vw, 2.2rem); }
+h2 { font-size: clamp(1.4rem, 3vw, 2rem); margin-bottom: 0.7rem; }
+.status-pill { border-radius: 999px; padding: 0.45rem 0.8rem; background: #e6e1d8; font-size: 0.82rem; }
+.status-valid { background: #d9eddf; color: #245d39; }
+.status-no-face, .status-eyes-closed, .status-invalid { background: #f4e9c9; color: #725619; }
+.status-error { background: #f4d8d5; color: #8c3028; }
+.setup-card { max-width: 680px; margin: 10vh auto 0; padding: clamp(1.5rem, 5vw, 3rem); background: #fffdf9; border: 1px solid #e5ded2; border-radius: 2rem; box-shadow: 0 1rem 3rem #51412a12; }
+.setup-card p { color: #5f6c70; line-height: 1.6; }
+.setup-actions, .toolbar-actions { display: flex; flex-wrap: wrap; gap: 0.7rem; align-items: center; }
+.preparation-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; margin: 1.4rem 0; }
+.preparation-details div { padding: 0.65rem 0.8rem; background: #f4f0e8; border-radius: 0.75rem; }
+.preparation-details dt { color: #718087; font-size: 0.7rem; text-transform: uppercase; }
+.preparation-details dd { margin: 0.2rem 0 0; overflow-wrap: anywhere; font-size: 0.82rem; }
+.timeout-control { display: flex; flex-direction: column; gap: 0.35rem; margin: 1rem 0; color: #68777d; font-size: 0.8rem; }
+.timeout-control input { width: 10rem; border: 1px solid #d8d1c6; border-radius: 0.5rem; padding: 0.5rem; color: #263238; background: #fff; }
+.experiment-warning { padding: 0.8rem; color: #725619 !important; background: #f4e9c9; border-radius: 0.8rem; }
+.primary-button, .secondary-button { border: 0; border-radius: 999px; padding: 0.8rem 1.15rem; }
+.primary-button { color: #fff; background: #397a69; }
+.secondary-button { color: #315b55; background: #e4eee9; }
+.secondary-button.active { color: #fff; background: #bd765d; }
+.secondary-button.compact { padding: 0.55rem 0.8rem; font-size: 0.82rem; }
+.debug-toggle { display: inline-flex; gap: 0.45rem; align-items: center; margin-top: 1.4rem; color: #617074; font-size: 0.85rem; }
+.debug-toggle.compact { margin: 0; }
+.privacy-note { margin: 1.5rem 0 0; font-size: 0.82rem; }
+.error-message { margin-top: 1rem; padding: 0.8rem; color: #8c3028 !important; background: #fae8e4; border-radius: 0.8rem; }
+.calibration-stage { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: calc(100vh - 9rem); overflow: hidden; border-radius: 2rem; background: #fffdf9; border: 1px solid #e5ded2; }
+.calibration-field { position: relative; min-height: 0; overflow: hidden; }
+.calibration-copy { z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto auto auto; align-content: center; column-gap: 1rem; width: 100%; padding: .6rem clamp(.8rem, 3vw, 1.4rem); text-align: center; background: #fffdf9; border-top: 1px solid #e5ded2; }
+.calibration-copy p:not(.eyebrow) { color: #5f6c70; line-height: 1.5; }
+.calibration-copy > .eyebrow, .calibration-copy > h2, .calibration-copy > p:not(.eyebrow):not(.error-message) { grid-column: 1; }
+.calibration-copy .session-actions { grid-column: 2; grid-row: 1 / span 4; align-self: center; flex-direction: column; }
+.calibration-copy .error-message { grid-column: 1 / -1; max-height: 2.8rem; overflow: hidden; margin: .25rem 0 0; }
+.calibration-dot { position: absolute; width: 2.8rem; height: 2.8rem; transform: translate(-50%, -50%); border: 0.6rem solid #fff; border-radius: 50%; background: #397a69; box-shadow: 0 0 0 0.35rem #397a6938; }
+.experiment-layout { max-width: 1400px; margin: 0 auto; }
+.guided-panel { margin-bottom: 1rem; padding: 1.2rem 1.4rem; text-align: center; background: #fffdf9; border: 1px solid #e5ded2; border-radius: 1.2rem; }
+.guided-panel h2 { margin-bottom: 0.4rem; }
+.guided-panel p:not(.eyebrow) { color: #5f6c70; }
+.guided-panel .setup-actions { justify-content: center; }
+.experiment-toolbar { margin-bottom: 1rem; padding: 0.8rem 1rem; background: #fffdf9; border: 1px solid #e5ded2; border-radius: 1.2rem; }
+.toolbar-status { margin: 0; color: #718087; font-size: 0.8rem; }
+.intended-control { display: inline-flex; gap: 0.4rem; align-items: center; color: #68777d; font-size: 0.78rem; }
+.intended-control select { border: 1px solid #d8d1c6; border-radius: 0.5rem; padding: 0.4rem; color: #263238; background: #fff; }
+.board { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(10rem, 1fr)); gap: clamp(0.8rem, 2vw, 1.8rem); min-height: min(72vh, 760px); padding: clamp(0.5rem, 2vw, 1.5rem); }
+.concept-target { position: relative; display: grid; place-items: center; min-height: 10rem; overflow: hidden; border: 0.25rem solid transparent; border-radius: clamp(1.4rem, 4vw, 3rem); color: #263238; box-shadow: 0 0.7rem 1.4rem #51412a16; transition: border-color 120ms ease, box-shadow 120ms ease; }
+.concept-target span:first-child { position: relative; z-index: 1; font-size: clamp(2.2rem, 8vw, 6rem); font-weight: 800; letter-spacing: 0.03em; }
+.target-sim { background: #cfe8d8; } .target-nao { background: #f3d0c7; } .target-agua { background: #cfe4f2; } .target-dor { background: #f1e3b8; }
+.concept-target.is-candidate { border-color: #263238; box-shadow: 0 0 0 0.3rem #fff, 0 0.8rem 1.5rem #51412a24; }
+.concept-target.is-selected { border-color: #397a69; }
+.dwell-progress { position: absolute; z-index: 0; left: 0; bottom: 0; width: 100%; height: 0.65rem; transform-origin: left; background: #397a69; }
+.debug-cursor { position: absolute; z-index: 3; width: 1rem; height: 1rem; transform: translate(-50%, -50%); border: 0.2rem solid #263238; border-radius: 50%; background: #fff; pointer-events: none; }
+.debug-panel { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin: 0 0 0.8rem; padding: 0.7rem; color: #526166; background: #f4f0e8; border: 1px solid #e5ded2; border-radius: 0.8rem; font-size: 0.75rem; }
+.debug-panel div { min-width: 0; }
+.debug-panel dt { color: #718087; text-transform: uppercase; }
+.debug-panel dd { margin: 0.2rem 0 0; overflow-wrap: anywhere; font-weight: 700; }
+.selection-feedback { min-height: 1.5rem; margin: 0.2rem 0 0.8rem; text-align: center; color: #397a69; font-weight: 700; }
+.metrics-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; margin: 0; }
+.metrics-strip div { padding: 0.6rem; text-align: center; background: #fffdf9; border: 1px solid #e5ded2; border-radius: 0.8rem; }
+.metrics-strip dt { color: #718087; font-size: 0.7rem; text-transform: uppercase; } .metrics-strip dd { margin: 0.2rem 0 0; font-weight: 800; }
+@media (max-width: 760px) { .app-header, .experiment-toolbar { align-items: flex-start; flex-direction: column; } .toolbar-actions { width: 100%; } .board { min-height: 68vh; } .metrics-strip, .preparation-details, .debug-panel { grid-template-columns: repeat(2, 1fr); } }
+
+html.active-session, body.active-session, #root.active-session { width: 100%; height: 100%; overflow: hidden; }
+html.active-session { overscroll-behavior: none; }
+.app-shell.active-session { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; min-height: 0; padding: 0; overflow: hidden; }
+.active-session .app-header { position: absolute; z-index: 10; inset: 0 0 auto; width: 100%; height: var(--session-header-height); max-width: none; margin: 0; padding: .7rem clamp(.8rem, 3vw, 2.5rem); }
+.active-session-shell { position: absolute; inset: var(--session-header-height) 0 0; overflow: hidden; }
+.session-instruction { position: absolute; z-index: 5; inset: 0 0 auto; height: var(--session-instruction-height); overflow: hidden; padding: .7rem clamp(.8rem, 3vw, 2rem); text-align: center; background: #fffdf9; border-bottom: 1px solid #e5ded2; }
+.session-instruction h2 { display: -webkit-box; overflow: hidden; margin: 0 auto .25rem; font-size: clamp(1.15rem, 3vw, 1.75rem); line-height: 1.15; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
+.session-instruction > p:not(.eyebrow), .session-instruction .guided-panel > p:not(.eyebrow) { display: -webkit-box; overflow: hidden; margin-bottom: .35rem; color: #5f6c70; line-height: 1.25; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
+.session-instruction .guided-panel, .session-instruction .experiment-toolbar { width: 100%; height: 100%; margin: 0; padding: 0; background: transparent; border: 0; box-shadow: none; }
+.session-instruction .guided-panel { display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.session-instruction .experiment-toolbar { display: flex; align-items: center; }
+.session-instruction .experiment-toolbar .toolbar-actions { justify-content: flex-end; min-width: 0; }
+.session-instruction .experiment-toolbar .toolbar-status { white-space: nowrap; }
+.session-actions { display: flex; justify-content: center; gap: .5rem; flex-wrap: wrap; }
+.interaction-region { position: absolute; top: var(--session-instruction-height); right: 0; bottom: var(--session-footer-height); left: 0; overflow: hidden; }
+.calibration-session .interaction-region { bottom: 0; background: #fffdf9; }
+.calibration-session .calibration-dot { left: 50%; top: 50%; }
+.board-session .board { min-height: 0; height: auto; padding: clamp(.4rem, 1.4vw, 1rem); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+.active-session .concept-target { min-height: 0; }
+.session-footer { position: absolute; z-index: 5; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; height: var(--session-footer-height); overflow: hidden; padding: 0 .8rem; background: #fffdf9; border-top: 1px solid #e5ded2; }
+.session-footer .selection-feedback { width: 100%; min-height: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session-footer .metrics-strip { width: min(700px, 100%); }
+.active-session .debug-panel { position: absolute; z-index: 4; top: calc(var(--session-instruction-height) + .5rem); right: .75rem; width: min(34rem, calc(100% - 1.5rem)); margin: 0; pointer-events: none; }
+.orientation-blocker { position: fixed; z-index: 30; inset: 0; display: grid; place-content: center; gap: .6rem; padding: 2rem; text-align: center; background: #f7f4eef7; }
+.orientation-blocker h2, .orientation-blocker p { margin: 0; }
+.orientation-blocker p { color: #5f6c70; }
+.orientation-message { padding: .8rem; color: #725619 !important; background: #f4e9c9; border-radius: .8rem; }
+
+@media (max-width: 760px) {
+  :root { --session-header-height: 4rem; --session-instruction-height: 6rem; --session-footer-height: 2.75rem; }
+  .active-session .app-header { padding: .55rem .75rem; }
+  .active-session .board { gap: .6rem; padding: .45rem; }
+  .active-session .concept-target span:first-child { font-size: clamp(1.8rem, 8vw, 4rem); }
+  .session-instruction { padding: .5rem .7rem; }
+  .session-instruction .experiment-toolbar { align-items: center; flex-direction: row; gap: .45rem; }
+  .session-instruction .experiment-toolbar > div:first-child { min-width: 0; }
+  .session-instruction .toolbar-actions { justify-content: flex-start; gap: .35rem; overflow: hidden; }
+  .session-instruction .secondary-button.compact { padding: .45rem .55rem; font-size: .68rem; }
+  .session-instruction .intended-control { font-size: .68rem; }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  :root { --session-header-height: 3.5rem; --session-instruction-height: 5.5rem; --session-footer-height: 2.25rem; }
+  .active-session .app-header h1 { font-size: 1.35rem; }
+  .session-instruction h2 { font-size: 1.1rem; }
+  .session-instruction > p:not(.eyebrow), .session-instruction .guided-panel > p:not(.eyebrow) { font-size: .78rem; }
+}
