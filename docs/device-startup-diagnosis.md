@@ -29,7 +29,9 @@ MB antes de gzip.
 - um único pedido e um único stream de câmera;
 - confirmação por um frame real, não apenas pela permissão;
 - detector de piscadas dedicado, sem TensorFlow/BlazeGaze;
-- Face Landmarker em worker, com CPU/WASM em vez de GPU/WebGL obrigatório;
+- Face Landmarker em worker clássico, com CPU/WASM em vez de GPU/WebGL
+  obrigatório; o formato clássico permite que o bootstrap WASM do MediaPipe
+  use `importScripts()`;
 - WASM da versão npm fixada servido pela própria aplicação;
 - rota legada carregada sob demanda, reduzindo o JavaScript inicial padrão para
   cerca de 220 KB antes de gzip;
