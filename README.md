@@ -49,7 +49,7 @@ npm install
 npm run dev
 ```
 
-Remote MediaPipe WASM and Face Landmarker model URLs are hardcoded in WebEyeTrack 0.0.2, so remote model loading is enabled automatically in development and remains opt-in for production builds via `VITE_ALLOW_REMOTE_MODEL_ASSETS=true`. See below for the full note on the provider's remote assets.
+The default blink path self-hosts the pinned MediaPipe WASM runtime and downloads only the official 3.6 MB Face Landmarker model. Its startup screen reports browser compatibility, permission, a real camera frame, model download and detector initialization separately. Set `VITE_FACE_LANDMARKER_MODEL_URL` at build time to self-host the model as well.
 
 In the blink app: `Iniciar` opens the camera and, once the face is tracked, the four-target board with `SIM` focused. Short blink advances focus, two short blinks move it back, long blink selects and speaks. If tracking is lost the board keeps its focus and no commands are accepted until the face is detected again. Phones, tablets and notebooks support both portrait and landscape without a minimum-viewport lock; the fixed 2×2 board remains scroll-free and cancels only an incomplete blink gesture if the viewport changes.
 
@@ -63,7 +63,7 @@ The experiment exports its in-memory session as JSON and does not send data to a
 
 Pushes to `main` run the GitHub Pages workflow after typecheck, lint, tests, and a production build. In the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions**. The live project site is `https://augustoafleal.github.io/gaze-acc/`.
 
-The published build enables WebEyeTrack's remote model assets and uses its repository subpath for local bundled model files. This phase is a standard HTTPS web deployment, not a PWA: it does not add a service worker, manifest, or offline cache.
+The published build enables WebEyeTrack's remote assets only for the preserved legacy gaze route. The default blink route uses the repository subpath for its pinned MediaPipe WASM files. This phase is a standard HTTPS web deployment, not a PWA: it does not add a service worker or manifest.
 
 ## Repository guide
 
@@ -78,9 +78,11 @@ The published build enables WebEyeTrack's remote model assets and uses its repos
 
 ## Current implementation
 
-The blink app lives in `src/ui/blink-aac.tsx` on top of a framework-free session controller (`src/communication/blink-session.ts`) that owns the gesture detector, blink navigation, command queue, and diagnostic events. The eye-state boundary (`src/gaze/eye-types.ts`) stays the only contract between the provider and the AAC layer.
+The blink app lives in `src/ui/blink-aac.tsx` on top of a framework-free session controller (`src/communication/blink-session.ts`) that owns the gesture detector, blink navigation, command queue, and diagnostic events. A dedicated MediaPipe worker performs only face/eye-state detection with the CPU/WASM delegate. The eye-state boundary (`src/gaze/eye-types.ts`) stays the only contract between the provider and the AAC layer.
 
-The WebEyeTrack provider still requires the BlazeGaze TensorFlow.js assets at `${VITE_BASE_PATH}/web/model.json` (default: `/web/model.json`), bundled under `public/web/` from a pinned upstream commit and documented there. It also hardcodes remote MediaPipe WASM and Face Landmarker model URLs, which are downloaded automatically during development; production builds need `VITE_ALLOW_REMOTE_MODEL_ASSETS=true` to allow them. Local camera inference is not the same as fully offline operation, and redistribution of the BlazeGaze artifacts still requires license review.
+The default blink route no longer loads TensorFlow.js, BlazeGaze or the WebEyeTrack worker. This reduces its initial JavaScript from roughly 2.9 MB to 220 KB before gzip and removes the forced WebGL/GPU delegate. The Face Landmarker model is still remote by default, but the UI reports its exact download stage and the URL can be replaced with a same-origin copy through `VITE_FACE_LANDMARKER_MODEL_URL`.
+
+The WebEyeTrack provider used only by `?legacy=1` still requires the BlazeGaze TensorFlow.js assets at `${VITE_BASE_PATH}/web/model.json` and hardcodes remote MediaPipe assets. Production legacy builds therefore still need `VITE_ALLOW_REMOTE_MODEL_ASSETS=true`. Redistribution of the BlazeGaze artifacts requires license review.
 
 The preserved legacy stack (`src/ui/gaze-legacy.tsx`, reached with `?legacy=1`) keeps the provider boundary in `src/gaze/`, the WebEyeTrack gaze adapter, 9-point calibration, four-target dwell interaction, local pointer testing, and the guided experiment with JSON export. Its thresholds and protocol are unchanged.
 

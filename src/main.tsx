@@ -1,14 +1,16 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
-import { createWebEyeTrackBlinkProvider } from "./gaze";
+import { MediaPipeBlinkProvider } from "./gaze/blink-provider";
 import { BlinkAACApp } from "./ui/blink-aac";
-import { GazeAACApp } from "./ui/gaze-legacy";
 
 const params = new URLSearchParams(window.location.search);
-const blinkApp = <BlinkAACApp providerFactory={createWebEyeTrackBlinkProvider} />;
-const legacyApp = <GazeAACApp />;
+const root = createRoot(document.getElementById("root")!);
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>{params.has("legacy") ? legacyApp : blinkApp}</StrictMode>,
-);
+if (params.has("legacy")) {
+  void import("./ui/gaze-legacy").then(({ GazeAACApp }) => {
+    root.render(<StrictMode><GazeAACApp /></StrictMode>);
+  });
+} else {
+  root.render(<StrictMode><BlinkAACApp providerFactory={() => new MediaPipeBlinkProvider()} /></StrictMode>);
+}

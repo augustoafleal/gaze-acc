@@ -137,6 +137,21 @@ html.active-session { overscroll-behavior: none; }
 .blink-start-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .7rem; margin-top: .4rem; }
 .layout-note { margin: 0; padding: .55rem .9rem; color: #725619 !important; background: #f4e9c9; border-radius: .7rem; }
 .legacy-link { margin-top: .8rem; border: 0; color: #8a9498; background: none; text-decoration: underline; font-size: .78rem; }
+.startup-checklist { display: grid; gap: .35rem; width: min(34rem, 100%); margin: .7rem 0; padding: 0; list-style: none; text-align: left; }
+.startup-checklist li { display: grid; grid-template-columns: 1.6rem minmax(0, 1fr); align-items: center; gap: .55rem; min-width: 0; padding: .45rem .65rem; border: 1px solid #e5ded2; border-radius: .7rem; color: #68777d; background: #fffdf9; }
+.startup-checklist li > span:last-child { display: flex; min-width: 0; justify-content: space-between; align-items: baseline; gap: .8rem; }
+.startup-checklist strong { color: #263238; font-size: .82rem; }
+.startup-checklist small { min-width: 0; overflow: hidden; text-align: right; text-overflow: ellipsis; white-space: nowrap; font-size: .76rem; }
+.startup-icon { display: grid; width: 1.45rem; height: 1.45rem; place-items: center; border-radius: 50%; font-weight: 900; background: #e6e1d8; }
+.startup-checklist .startup-ready { border-color: #c4dfcc; background: #eff8f1; }
+.startup-ready .startup-icon { color: #fff; background: #397a69; }
+.startup-checklist .startup-active { border-color: #e5d39e; background: #fff8e6; }
+.startup-active .startup-icon { color: #725619; background: #f4e9c9; }
+.startup-checklist .startup-error { border-color: #e7bbb5; background: #fff0ee; }
+.startup-error .startup-icon { color: #fff; background: #a94d43; }
+.startup-error-panel { width: min(36rem, 100%); max-height: 48vh; overflow: auto; }
+.startup-error-panel .error-message { margin: 0; }
+.startup-error-panel .startup-checklist { margin-bottom: 0; }
 .tracking-pill { min-width: 0; overflow: hidden; border-radius: 999px; padding: .35rem .8rem; font-size: .85rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .tracking-starting { color: #725619; background: #f4e9c9; }
 .tracking-ok { color: #245d39; background: #d9eddf; }
@@ -166,6 +181,10 @@ html.active-session { overscroll-behavior: none; }
 }
 
 @media (max-width: 420px), (max-height: 420px) {
+  .startup-checklist { gap: .22rem; margin: .35rem 0; }
+  .startup-checklist li { grid-template-columns: 1.3rem minmax(0, 1fr); padding: .25rem .45rem; }
+  .startup-icon { width: 1.2rem; height: 1.2rem; font-size: .7rem; }
+  .startup-checklist strong, .startup-checklist small { font-size: .68rem; }
   .blink-board-header { flex-basis: 2.65rem; gap: .4rem; padding-right: max(env(safe-area-inset-right), .45rem); padding-left: max(env(safe-area-inset-left), .45rem); }
   .tracking-pill { padding: .25rem .5rem; font-size: .72rem; }
   .blink-operator-tools { gap: .35rem; }
