@@ -92,7 +92,32 @@ describe("BlinkAACApp start screen", () => {
     expect(screen.getByText("piscada curta")).toBeTruthy();
     expect(screen.getByText("piscada longa")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Iniciar" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Treinar piscadas" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Treinar piscadas" })).toBeNull();
+    expect((screen.getByRole("spinbutton", { name: "Piscada mínima (ms)" }) as HTMLInputElement).value).toBe("120");
+    expect((screen.getByRole("spinbutton", { name: "Piscada longa (ms)" }) as HTMLInputElement).value).toBe("700");
+    expect((screen.getByRole("spinbutton", { name: "Janela da piscada dupla (ms)" }) as HTMLInputElement).value).toBe("450");
+  });
+
+  it("validates the editable blink timings before starting", () => {
+    render(<BlinkAACApp speakText={vi.fn()} />);
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Piscada longa (ms)" }), { target: { value: "100" } });
+    expect(screen.getByText("A piscada longa deve ser maior que a piscada mínima.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Iniciar" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  it("allows a timing field to be emptied while editing and blocks only session start", () => {
+    render(<BlinkAACApp speakText={vi.fn()} />);
+    const minimum = screen.getByRole("spinbutton", { name: "Piscada mínima (ms)" }) as HTMLInputElement;
+    fireEvent.change(minimum, { target: { value: "" } });
+
+    expect(minimum.value).toBe("");
+    expect(screen.getByText("Informe a duração mínima da piscada.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Iniciar" }).hasAttribute("disabled")).toBe(true);
+
+    fireEvent.change(minimum, { target: { value: "150" } });
+    expect(minimum.value).toBe("150");
+    expect(screen.queryByText("Informe a duração mínima da piscada.")).toBeNull();
+    expect(screen.getByRole("button", { name: "Iniciar" }).hasAttribute("disabled")).toBe(false);
   });
 
   it("exposes the legacy link only when a handler is provided", () => {
@@ -108,6 +133,23 @@ describe("BlinkAACApp start screen", () => {
 });
 
 describe("BlinkAACApp session flow", () => {
+  it("uses the edited timing values in the session", async () => {
+    const speakText = vi.fn();
+    const provider = new FakeProvider();
+    render(<BlinkAACApp providerFactory={() => provider} speakText={speakText} />);
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Piscada longa (ms)" }), { target: { value: "400" } });
+    fireEvent.click(screen.getByRole("button", { name: "Iniciar" }));
+    await waitFor(() => expect(provider.initializeCalls).toBe(1));
+    startBoard(provider);
+
+    blink(provider, [
+      ["open", 4_000],
+      ["closed", 4_300],
+      ["open", 4_800],
+    ]);
+    expect(speakText).toHaveBeenCalledWith("Sim");
+  });
+
   it("shows which startup stage failed after camera permission was granted", async () => {
     const provider = new ModelFailureProvider();
     render(<BlinkAACApp providerFactory={() => provider} speakText={vi.fn()} />);
@@ -252,22 +294,6 @@ describe("BlinkAACApp session flow", () => {
 
     blink(provider, shortBlink.map(([state, t]) => [state, t + 60_000] as [EyeObservation["state"], number]));
     focusedButton("NÃO");
-  });
-
-  it("runs the optional training flow before the board", async () => {
-    const provider = new FakeProvider();
-    render(<BlinkAACApp providerFactory={() => provider} speakText={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Treinar piscadas" }));
-    await waitFor(() => expect(provider.initializeCalls).toBe(1));
-    blink(provider, [["open", 3_000]]);
-
-    expect(await screen.findByText(/treinamento opcional/i)).toBeTruthy();
-    for (let step = 0; step < 3; step += 1) {
-      expect(screen.getByRole("button", { name: step === 2 ? "Ativar navegação" : "Avançar" })).toBeTruthy();
-      fireEvent.click(screen.getByRole("button", { name: step === 2 ? "Ativar navegação" : "Avançar" }));
-    }
-    expect(await screen.findByText(/navegação ativa/i)).toBeTruthy();
-    focusedButton("SIM");
   });
 
   it("exits to the ended screen and stops the provider", async () => {

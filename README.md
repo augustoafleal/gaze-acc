@@ -24,7 +24,7 @@ Core principles:
 The default application is a single-purpose blink communicator for the human test:
 
 - start screen that explains the three gestures;
-- camera session with optional blink training;
+- camera session with three adjustable blink timings on the start screen;
 - four large, fixed targets: `SIM`, `NÃO`, `VIRAR`, `DOR`;
 - short blink = next, double short blink = previous, long blink = select;
 - dwell selection is replaced by a long blink, but the underlying dwell and blink gesture modules remain in the repository;
@@ -49,9 +49,17 @@ npm install
 npm run dev
 ```
 
+To test from another device through a temporary HTTPS URL, keep the development
+server and Cloudflare tunnel in separate terminals:
+
+```bash
+npm run dev -- --host 0.0.0.0
+cloudflared tunnel --url http://localhost:5173
+```
+
 The default blink path self-hosts the pinned MediaPipe WASM runtime and downloads only the official 3.6 MB Face Landmarker model. Its startup screen reports browser compatibility, permission, a real camera frame, model download and detector initialization separately. Set `VITE_FACE_LANDMARKER_MODEL_URL` at build time to self-host the model as well.
 
-In the blink app: `Iniciar` opens the camera and, once the face is tracked, the four-target board with `SIM` focused. Short blink advances focus, two short blinks move it back, long blink selects and speaks. If tracking is lost the board keeps its focus and no commands are accepted until the face is detected again. Phones, tablets and notebooks support both portrait and landscape without a minimum-viewport lock; the fixed 2×2 board remains scroll-free and cancels only an incomplete blink gesture if the viewport changes.
+In the blink app, the start screen exposes the minimum intentional blink, long-blink threshold, and double-blink window, prefilled with the experimental defaults. `Iniciar` opens the camera and, once the face is tracked, the four-target board with `SIM` focused. Short blink advances focus, two short blinks move it back, long blink selects and speaks. If tracking is lost the board keeps its focus and no commands are accepted until the face is detected again. Phones, tablets and notebooks support both portrait and landscape without a minimum-viewport lock; the fixed 2×2 board remains scroll-free and cancels only an incomplete blink gesture if the viewport changes.
 
 Add `?legacy=1` to the URL to reach the previous dwell/gaze interface (calibration, free mode, pointer test mode, and the guided experiment). That interface is preserved for reference; it is not the product flow. The optional blink index in the legacy UI and the old `?blinkSynthetic` hook remain available for development only.
 
