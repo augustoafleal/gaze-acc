@@ -126,14 +126,23 @@ html.active-session { overscroll-behavior: none; }
 .blink-shell { position: fixed; inset: 0; width: 100%; height: 100dvh; min-height: 0; overflow: hidden; padding: 0; background: #f7f4ee; }
 .blink-shell h1, .blink-shell h2 { text-align: center; margin-bottom: .5rem; }
 .blink-shell p { color: #5f6c70; line-height: 1.5; }
-.blink-start, .blink-boot, .blink-training, .blink-ended { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6rem; padding: clamp(1rem, 3vh, 2rem) clamp(1rem, 5vw, 2.5rem); overflow: hidden; text-align: center; }
-.blink-start { max-width: 46rem; margin: 0 auto; }
+.blink-start, .blink-boot, .blink-ended { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6rem; padding: clamp(1rem, 3vh, 2rem) clamp(1rem, 5vw, 2.5rem); overflow: hidden; text-align: center; }
+.blink-start { max-width: 46rem; margin: 0 auto; justify-content: flex-start; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.blink-start::before, .blink-start::after { content: ""; flex: 1 0 0; }
 .blink-start h1 { font-size: clamp(1.9rem, 6vw, 3rem); }
 .blink-start-instruction { margin: 0; font-size: clamp(1rem, 2.4vw, 1.35rem); }
 .blink-legend { display: grid; gap: .45rem; max-width: 30rem; width: 100%; margin: .7rem 0; padding: 0; list-style: none; }
 .blink-legend li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .65rem 1rem; background: #fffdf9; border: 1px solid #e5ded2; border-radius: .8rem; color: #5f6c70; }
 .blink-legend li span:first-child { color: #263238; font-weight: 800; }
 .legend-short::after, .legend-double::after, .legend-long::after { content: "→"; margin-left: 1rem; color: #397a69; }
+.blink-timing-settings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .55rem; width: min(38rem, 100%); margin: 0; padding: .55rem .7rem .7rem; border: 1px solid #d8d1c6; border-radius: .8rem; background: #fffdf9; text-align: left; }
+.blink-timing-settings legend { padding: 0 .35rem; color: #68777d; font-size: .78rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.blink-timing-settings label { display: grid; gap: .25rem; min-width: 0; color: #263238; font-size: .78rem; font-weight: 800; }
+.blink-timing-settings label > small { overflow: hidden; color: #718087; font-size: .66rem; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.timing-input { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .3rem; }
+.timing-input input { width: 100%; min-width: 0; border: 1px solid #cfc7bb; border-radius: .5rem; padding: .45rem .5rem; color: #263238; background: #fff; font: inherit; }
+.timing-input small { color: #68777d; font-size: .68rem; font-weight: 700; }
+.timing-error { width: min(38rem, 100%); margin: 0; color: #8c3028 !important; font-size: .78rem; }
 .blink-start-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .7rem; margin-top: .4rem; }
 .layout-note { margin: 0; padding: .55rem .9rem; color: #725619 !important; background: #f4e9c9; border-radius: .7rem; }
 .legacy-link { margin-top: .8rem; border: 0; color: #8a9498; background: none; text-decoration: underline; font-size: .78rem; }
@@ -180,6 +189,29 @@ html.active-session { overscroll-behavior: none; }
   .blink-legend li { font-size: .92rem; }
 }
 
+@media (max-width: 600px) and (orientation: portrait) {
+  .blink-start { gap: .35rem; padding: max(env(safe-area-inset-top), .75rem) .7rem max(env(safe-area-inset-bottom), .75rem); }
+  .blink-start > .eyebrow { font-size: .66rem; }
+  .blink-start h1 { margin-bottom: .2rem; font-size: clamp(1.55rem, 8vw, 2rem); line-height: 1.05; }
+  .blink-start-instruction { font-size: .9rem; line-height: 1.3 !important; }
+  .blink-legend { gap: .25rem; margin: .25rem 0; }
+  .blink-legend li { gap: .45rem; padding: .38rem .6rem; border-radius: .6rem; font-size: .78rem; line-height: 1.15; }
+  .legend-short::after, .legend-double::after, .legend-long::after { margin-left: .4rem; }
+  .blink-timing-settings { gap: .3rem; padding: .35rem .45rem .45rem; }
+  .blink-timing-settings legend { font-size: .64rem; }
+  .blink-timing-settings label { gap: .18rem; font-size: .65rem; line-height: 1.1; }
+  .blink-timing-settings label > small { display: none; }
+  .timing-input { gap: .2rem; }
+  .timing-input input { appearance: textfield; padding: .34rem .3rem; font-size: .76rem; }
+  .timing-input input::-webkit-inner-spin-button, .timing-input input::-webkit-outer-spin-button { margin: 0; appearance: none; }
+  .timing-input small { font-size: .6rem; }
+  .layout-note { padding: .35rem .55rem; font-size: .7rem; line-height: 1.25 !important; }
+  .blink-start-actions { margin-top: .15rem; }
+  .blink-start-actions .primary-button { padding: .65rem 1.2rem; }
+  .legacy-link { margin-top: .2rem; font-size: .68rem; }
+  .blink-start .privacy-note { margin-top: .2rem; font-size: .66rem; line-height: 1.25; }
+}
+
 @media (max-width: 420px), (max-height: 420px) {
   .startup-checklist { gap: .22rem; margin: .35rem 0; }
   .startup-checklist li { grid-template-columns: 1.3rem minmax(0, 1fr); padding: .25rem .45rem; }
@@ -197,10 +229,13 @@ html.active-session { overscroll-behavior: none; }
 }
 
 @media (max-height: 420px) and (orientation: landscape) {
-  .blink-start, .blink-boot, .blink-training, .blink-ended { gap: .3rem; padding-top: .55rem; padding-bottom: .55rem; }
+  .blink-start, .blink-boot, .blink-ended { gap: .3rem; padding-top: .55rem; padding-bottom: .55rem; }
   .blink-start h1 { font-size: 1.55rem; }
   .blink-legend { gap: .25rem; margin: .2rem 0; }
   .blink-legend li { padding: .35rem .65rem; }
+  .blink-timing-settings { gap: .3rem; padding: .35rem .45rem .45rem; }
+  .blink-timing-settings label > small { display: none; }
+  .timing-input input { padding: .3rem .35rem; }
   .layout-note { display: none; }
   .privacy-note { margin-top: .35rem; font-size: .7rem; }
 }

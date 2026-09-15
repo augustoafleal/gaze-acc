@@ -1,33 +1,15 @@
-/// <reference lib="webworker" />
-
-import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
-import type { NormalizedLandmark } from "@mediapipe/tasks-vision";
-
 const EYE_CLOSED_THRESHOLD = 0.2;
-const LEFT_EYE = [362, 385, 387, 263, 373, 380] as const;
-const RIGHT_EYE = [133, 158, 160, 33, 144, 153] as const;
+const LEFT_EYE = [362, 385, 387, 263, 373, 380];
+const RIGHT_EYE = [133, 158, 160, 33, 144, 153];
 
-type InitMessage = {
-  type: "init";
-  wasmBaseUrl: string;
-  modelBuffer: ArrayBuffer;
-};
+let faceLandmarker = null;
+let mediaPipe = null;
 
-type FrameMessage = {
-  type: "frame";
-  frame: ImageBitmap;
-  timestampMs: number;
-};
-
-type IncomingMessage = InitMessage | FrameMessage | { type: "close" };
-
-let faceLandmarker: FaceLandmarker | null = null;
-
-function distance(a: NormalizedLandmark, b: NormalizedLandmark): number {
+function distance(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-function eyeAspectRatio(landmarks: NormalizedLandmark[], indices: readonly number[]): number | null {
+function eyeAspectRatio(landmarks, indices) {
   const [outer, upperOuter, upperInner, inner, lowerInner, lowerOuter] = indices.map((index) => landmarks[index]);
   if (!outer || !upperOuter || !upperInner || !inner || !lowerInner || !lowerOuter) return null;
   const width = distance(outer, inner);
@@ -35,7 +17,7 @@ function eyeAspectRatio(landmarks: NormalizedLandmark[], indices: readonly numbe
   return (distance(upperOuter, lowerOuter) + distance(upperInner, lowerInner)) / (2 * width);
 }
 
-function classifyEyes(landmarks: NormalizedLandmark[]): "open" | "closed" | "unavailable" {
+function classifyEyes(landmarks) {
   const left = eyeAspectRatio(landmarks, LEFT_EYE);
   const right = eyeAspectRatio(landmarks, RIGHT_EYE);
   if (left === null || right === null) return "unavailable";
@@ -45,16 +27,31 @@ function classifyEyes(landmarks: NormalizedLandmark[]): "open" | "closed" | "una
   return left < EYE_CLOSED_THRESHOLD || right < EYE_CLOSED_THRESHOLD ? "closed" : "open";
 }
 
-function errorMessage(reason: unknown): string {
+function errorMessage(reason) {
   return reason instanceof Error ? reason.message : String(reason);
 }
 
-self.onmessage = async (event: MessageEvent<IncomingMessage>) => {
+function loadMediaPipe(visionBundleUrl) {
+  if (mediaPipe) return mediaPipe;
+  // vision_bundle.cjs writes its public API to the global `exports` object.
+  // Loading it with importScripts is valid because this file is always served
+  // to a classic worker, in both Vite development and production builds.
+  globalThis.exports = {};
+  globalThis.importScripts(visionBundleUrl);
+  mediaPipe = globalThis.exports;
+  if (!mediaPipe.FaceLandmarker || !mediaPipe.FilesetResolver) {
+    throw new Error("A biblioteca local do detector facial não foi carregada corretamente.");
+  }
+  return mediaPipe;
+}
+
+globalThis.onmessage = async (event) => {
   const message = event.data;
 
   if (message.type === "init") {
     try {
-      self.postMessage({ type: "engine-loading" });
+      globalThis.postMessage({ type: "engine-loading" });
+      const { FaceLandmarker, FilesetResolver } = loadMediaPipe(message.visionBundleUrl);
       const fileset = await FilesetResolver.forVisionTasks(message.wasmBaseUrl);
       faceLandmarker = await FaceLandmarker.createFromOptions(fileset, {
         baseOptions: {
@@ -68,9 +65,9 @@ self.onmessage = async (event: MessageEvent<IncomingMessage>) => {
         outputFaceBlendshapes: false,
         outputFacialTransformationMatrixes: false,
       });
-      self.postMessage({ type: "ready" });
+      globalThis.postMessage({ type: "ready" });
     } catch (reason) {
-      self.postMessage({ type: "fatal", message: errorMessage(reason) });
+      globalThis.postMessage({ type: "fatal", message: errorMessage(reason) });
     }
     return;
   }
@@ -78,7 +75,7 @@ self.onmessage = async (event: MessageEvent<IncomingMessage>) => {
   if (message.type === "close") {
     faceLandmarker?.close();
     faceLandmarker = null;
-    self.close();
+    globalThis.close();
     return;
   }
 
@@ -87,12 +84,10 @@ self.onmessage = async (event: MessageEvent<IncomingMessage>) => {
     const result = faceLandmarker.detectForVideo(message.frame, message.timestampMs);
     const landmarks = result.faceLandmarks[0];
     const state = landmarks ? classifyEyes(landmarks) : "unavailable";
-    self.postMessage({ type: "observation", state, timestampMs: message.timestampMs });
+    globalThis.postMessage({ type: "observation", state, timestampMs: message.timestampMs });
   } catch (reason) {
-    self.postMessage({ type: "frame-error", message: errorMessage(reason), timestampMs: message.timestampMs });
+    globalThis.postMessage({ type: "frame-error", message: errorMessage(reason), timestampMs: message.timestampMs });
   } finally {
     message.frame.close();
   }
 };
-
-export {};

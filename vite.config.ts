@@ -38,6 +38,11 @@ const MEDIAPIPE_WASM_FILES = [
   "vision_wasm_nosimd_internal.wasm",
 ] as const;
 
+const MEDIAPIPE_SCRIPT_FILES = {
+  "blink-worker.js": resolve(process.cwd(), "src/gaze/mediapipe-blink.worker.classic.js"),
+  "vision_bundle.js": resolve(process.cwd(), "node_modules/@mediapipe/tasks-vision/vision_bundle.cjs"),
+} as const;
+
 function mediapipeWasmAssetsPlugin(base: string): Plugin {
   const sourceDirectory = resolve(process.cwd(), "node_modules/@mediapipe/tasks-vision/wasm");
   const publicPrefix = `${base}mediapipe/wasm/`;
@@ -57,6 +62,13 @@ function mediapipeWasmAssetsPlugin(base: string): Plugin {
           source: readFileSync(resolve(sourceDirectory, filename)),
         });
       }
+      for (const [filename, sourcePath] of Object.entries(MEDIAPIPE_SCRIPT_FILES)) {
+        this.emitFile({
+          type: "asset",
+          fileName: `mediapipe/${filename}`,
+          source: readFileSync(sourcePath),
+        });
+      }
     },
     configureServer(server) {
       server.middlewares.use((request, response, next) => {
@@ -64,14 +76,24 @@ function mediapipeWasmAssetsPlugin(base: string): Plugin {
         const filename = MEDIAPIPE_WASM_FILES.find((candidate) =>
           pathname === `${publicPrefix}${candidate}` || pathname === `/mediapipe/wasm/${candidate}`,
         );
-        if (!filename) {
+        if (filename) {
+          response.statusCode = 200;
+          response.setHeader("Content-Type", filename.endsWith(".wasm") ? "application/wasm" : "text/javascript; charset=utf-8");
+          response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+          response.end(readFileSync(resolve(sourceDirectory, filename)));
+          return;
+        }
+        const scriptEntry = Object.entries(MEDIAPIPE_SCRIPT_FILES).find(([candidate]) =>
+          pathname === `${base}mediapipe/${candidate}` || pathname === `/mediapipe/${candidate}`,
+        );
+        if (!scriptEntry) {
           next();
           return;
         }
         response.statusCode = 200;
-        response.setHeader("Content-Type", filename.endsWith(".wasm") ? "application/wasm" : "text/javascript; charset=utf-8");
-        response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-        response.end(readFileSync(resolve(sourceDirectory, filename)));
+        response.setHeader("Content-Type", "text/javascript; charset=utf-8");
+        response.setHeader("Cache-Control", "no-cache");
+        response.end(readFileSync(scriptEntry[1]));
       });
     },
   };

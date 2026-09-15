@@ -4,8 +4,6 @@ import type {
   EyeProviderStatusListener,
   EyeStateProvider,
 } from "./eye-types";
-import MediaPipeBlinkWorker from "./mediapipe-blink.worker?worker";
-
 const CAMERA_START_TIMEOUT_MS = 20_000;
 const ENGINE_START_TIMEOUT_MS = 45_000;
 const MIN_FRAME_INTERVAL_MS = 50;
@@ -57,6 +55,8 @@ export class MediaPipeBlinkProvider implements EyeStateProvider {
 
   private readonly modelUrl: string;
   private readonly wasmBaseUrl: string;
+  private readonly workerUrl: string;
+  private readonly visionBundleUrl: string;
   private video: HTMLVideoElement | null = null;
   private stream: MediaStream | null = null;
   private worker: Worker | null = null;
@@ -73,6 +73,8 @@ export class MediaPipeBlinkProvider implements EyeStateProvider {
     const configuredModelUrl = import.meta.env.VITE_FACE_LANDMARKER_MODEL_URL?.trim();
     this.modelUrl = options.modelUrl ?? (configuredModelUrl || DEFAULT_MODEL_URL);
     this.wasmBaseUrl = options.wasmBaseUrl ?? new URL(`${base}mediapipe/wasm`, window.location.origin).toString();
+    this.workerUrl = new URL(`${base}mediapipe/blink-worker.js`, window.location.origin).toString();
+    this.visionBundleUrl = new URL(`${base}mediapipe/vision_bundle.js`, window.location.origin).toString();
   }
 
   async initialize(video: HTMLVideoElement, onStatus?: EyeProviderStatusListener): Promise<void> {
@@ -252,9 +254,11 @@ export class MediaPipeBlinkProvider implements EyeStateProvider {
 
   private initializeEngine(modelBuffer: ArrayBuffer): Promise<void> {
     this.report("engine", "active", "Preparando o detector no aparelho…");
-    // MediaPipe's WASM bootstrap calls importScripts(), which is forbidden in
-    // module workers. Vite's ?worker constructor emits a classic IIFE worker.
-    this.worker = new MediaPipeBlinkWorker();
+    // This must always be a classic worker: MediaPipe's WASM bootstrap calls
+    // importScripts(), which is forbidden in module workers. Vite's ?worker
+    // wrapper becomes a module worker during development, so use a same-origin
+    // static worker explicitly instead of relying on Vite's environment switch.
+    this.worker = new Worker(this.workerUrl, { name: "mediapipe-blink" });
 
     return new Promise((resolve, reject) => {
       const worker = this.worker!;
@@ -304,7 +308,12 @@ export class MediaPipeBlinkProvider implements EyeStateProvider {
         }
       };
 
-      worker.postMessage({ type: "init", wasmBaseUrl: this.wasmBaseUrl, modelBuffer }, [modelBuffer]);
+      worker.postMessage({
+        type: "init",
+        visionBundleUrl: this.visionBundleUrl,
+        wasmBaseUrl: this.wasmBaseUrl,
+        modelBuffer,
+      }, [modelBuffer]);
     });
   }
 

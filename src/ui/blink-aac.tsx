@@ -6,12 +6,6 @@ import { DEFAULT_BLINK_CONFIG, type BlinkConfig, type BlinkDetectorSnapshot } fr
 import type { EyeObservation, EyeProviderStartupStatus, EyeProviderStartupStep, EyeStateProvider } from "../gaze/eye-types";
 import { speak } from "../speech/tts";
 
-const BLINK_TRAINING_STEPS = [
-  "Piscada curta: avança para o próximo lembrete.",
-  "Duas piscadas curtas: volta para o anterior.",
-  "Piscada longa (segurar os olhos fechados): seleciona.",
-] as const;
-
 function formatCommand(command: BlinkCommand): string {
   if (command.kind === "select") return `Selecionado: ${conceptLabel(command.target)}`;
   return `${command.kind === "next" ? "Próximo" : "Anterior"}: ${conceptLabel(command.target)}`;
@@ -25,7 +19,47 @@ export type BlinkAACProps = {
   onRequestLegacy?: () => void;
 };
 
-type Screen = "start" | "boot" | "training" | "board" | "ended";
+type Screen = "start" | "boot" | "board" | "ended";
+
+type BlinkTimingSettings = Pick<BlinkConfig, "minIntentionalBlinkMs" | "longBlinkThresholdMs" | "doubleBlinkWindowMs">;
+type BlinkTimingDraft = Record<keyof BlinkTimingSettings, string>;
+
+function parseTimingDraft(settings: BlinkTimingDraft): BlinkTimingSettings | null {
+  const minIntentionalBlinkMs = Number(settings.minIntentionalBlinkMs);
+  const longBlinkThresholdMs = Number(settings.longBlinkThresholdMs);
+  const doubleBlinkWindowMs = Number(settings.doubleBlinkWindowMs);
+  if (
+    !settings.minIntentionalBlinkMs.trim()
+    || !settings.longBlinkThresholdMs.trim()
+    || !settings.doubleBlinkWindowMs.trim()
+    || !Number.isFinite(minIntentionalBlinkMs)
+    || !Number.isFinite(longBlinkThresholdMs)
+    || !Number.isFinite(doubleBlinkWindowMs)
+  ) return null;
+  return { minIntentionalBlinkMs, longBlinkThresholdMs, doubleBlinkWindowMs };
+}
+
+function timingValidationMessage(settings: BlinkTimingDraft, maxClosedDurationMs: number): string | null {
+  if (!settings.minIntentionalBlinkMs.trim()) return "Informe a duração mínima da piscada.";
+  if (!settings.longBlinkThresholdMs.trim()) return "Informe a duração da piscada longa.";
+  if (!settings.doubleBlinkWindowMs.trim()) return "Informe a janela da piscada dupla.";
+  const parsed = parseTimingDraft(settings);
+  if (!parsed) return "Use apenas números válidos nos ajustes de piscada.";
+  if (parsed.minIntentionalBlinkMs < 50 || parsed.minIntentionalBlinkMs > 2_000) {
+    return "A piscada mínima deve ficar entre 50 e 2000 ms.";
+  }
+  if (parsed.longBlinkThresholdMs < 100) return "A piscada longa deve ser de pelo menos 100 ms.";
+  if (parsed.longBlinkThresholdMs <= parsed.minIntentionalBlinkMs) {
+    return "A piscada longa deve ser maior que a piscada mínima.";
+  }
+  if (parsed.longBlinkThresholdMs > maxClosedDurationMs) {
+    return `A piscada longa não pode ultrapassar ${maxClosedDurationMs} ms.`;
+  }
+  if (parsed.doubleBlinkWindowMs < 100 || parsed.doubleBlinkWindowMs > 3_000) {
+    return "A janela da piscada dupla deve ficar entre 100 e 3000 ms.";
+  }
+  return null;
+}
 
 const STARTUP_STEPS: Array<{ id: EyeProviderStartupStep; label: string }> = [
   { id: "compatibility", label: "Navegador" },
@@ -68,7 +102,6 @@ export function BlinkAACApp({
   const pulseTimerRef = useRef<number | null>(null);
   const bootingRef = useRef(false);
   const reportedStartupStepsRef = useRef(new Set<EyeProviderStartupStep>());
-  const trainingEnabledRef = useRef(false);
   const applyObservationRef = useRef<(observation: EyeObservation) => void>(() => {});
   const defaultProviderFactoryRef = useRef((() => {
     throw new Error("No blink eye-state provider was configured.");
@@ -82,14 +115,24 @@ export function BlinkAACApp({
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [debugOn, setDebugOn] = useState(debugByDefault);
-  const [trainingStep, setTrainingStep] = useState(0);
   const [exitArmed, setExitArmed] = useState(false);
   const [booting, setBooting] = useState(false);
   const [debugData, setDebugData] = useState<BlinkDetectorSnapshot | null>(null);
   const [diagnosticCount, setDiagnosticCount] = useState(0);
   const [startupStatuses, setStartupStatuses] = useState<StartupStatusMap>({});
+  const [timingSettings, setTimingSettings] = useState<BlinkTimingDraft>(() => ({
+    minIntentionalBlinkMs: String(config.minIntentionalBlinkMs),
+    longBlinkThresholdMs: String(config.longBlinkThresholdMs),
+    doubleBlinkWindowMs: String(config.doubleBlinkWindowMs),
+  }));
+  const [sessionConfig, setSessionConfig] = useState<BlinkConfig>(config);
 
   const factory = providerFactory ?? defaultProviderFactoryRef.current;
+  const timingError = timingValidationMessage(timingSettings, config.maxClosedDurationMs);
+
+  const updateTiming = (field: keyof BlinkTimingSettings, value: string) => {
+    setTimingSettings((current) => ({ ...current, [field]: value }));
+  };
 
   const applyObservation = useCallback((observation: EyeObservation) => {
     const controller = sessionRef.current;
@@ -126,19 +169,21 @@ export function BlinkAACApp({
     setTracking("starting");
   }, []);
 
-  const beginSession = useCallback(async (training: boolean) => {
-    if (bootingRef.current) return;
+  const beginSession = useCallback(async () => {
+    const parsedTimingSettings = parseTimingDraft(timingSettings);
+    if (bootingRef.current || timingValidationMessage(timingSettings, config.maxClosedDurationMs) || !parsedTimingSettings) return;
     bootingRef.current = true;
     setBooting(true);
     setError(null);
     setFeedback("");
+    setFocused("sim");
     setSelected(null);
     setExitArmed(false);
     reportedStartupStepsRef.current = new Set();
     setStartupStatuses({});
-    trainingEnabledRef.current = training;
-    setTrainingStep(0);
-    const controller = new BlinkAACSessionController(config);
+    const configuredSession = { ...config, ...parsedTimingSettings };
+    setSessionConfig(configuredSession);
+    const controller = new BlinkAACSessionController(configuredSession);
     sessionRef.current = controller;
     controller.start();
     setScreen("boot");
@@ -174,11 +219,11 @@ export function BlinkAACApp({
     }
     bootingRef.current = false;
     setBooting(false);
-  }, [applyObservation, config, factory]);
+  }, [applyObservation, config, factory, timingSettings]);
 
   useEffect(() => {
     if (sessionStage === "active" && screen === "boot") {
-      setScreen(trainingEnabledRef.current ? "training" : "board");
+      setScreen("board");
     }
   }, [sessionStage, screen]);
 
@@ -230,13 +275,6 @@ export function BlinkAACApp({
     if (pulseTimerRef.current !== null) window.clearTimeout(pulseTimerRef.current);
   }, []);
 
-  const activateNavigation = () => {
-    sessionRef.current?.navToStart();
-    setFocused("sim");
-    setFeedback("Navegação ativa. SIM é o item inicial.");
-    setScreen("board");
-  };
-
   const requestExit = () => setExitArmed(true);
   const cancelExit = () => setExitArmed(false);
 
@@ -285,6 +323,25 @@ export function BlinkAACApp({
             <li><span className="legend-double">duas piscadas curtas</span><span>anterior</span></li>
             <li><span className="legend-long">piscada longa</span><span>selecionar</span></li>
           </ul>
+          <fieldset className="blink-timing-settings">
+            <legend>Ajustes de piscada</legend>
+            <label>
+              <span>Piscada mínima</span>
+              <span className="timing-input"><input type="number" aria-label="Piscada mínima (ms)" min="50" max="2000" step="10" value={timingSettings.minIntentionalBlinkMs} onChange={(event) => updateTiming("minIntentionalBlinkMs", event.currentTarget.value)} /><small>ms</small></span>
+              <small>Abaixo disso, ignora</small>
+            </label>
+            <label>
+              <span>Piscada longa</span>
+              <span className="timing-input"><input type="number" aria-label="Piscada longa (ms)" min="100" max={config.maxClosedDurationMs} step="50" value={timingSettings.longBlinkThresholdMs} onChange={(event) => updateTiming("longBlinkThresholdMs", event.currentTarget.value)} /><small>ms</small></span>
+              <small>A partir disso, seleciona</small>
+            </label>
+            <label>
+              <span>Janela da dupla</span>
+              <span className="timing-input"><input type="number" aria-label="Janela da piscada dupla (ms)" min="100" max="3000" step="50" value={timingSettings.doubleBlinkWindowMs} onChange={(event) => updateTiming("doubleBlinkWindowMs", event.currentTarget.value)} /><small>ms</small></span>
+              <small>Tempo para a 2ª piscada</small>
+            </label>
+          </fieldset>
+          {timingError && <p className="timing-error" role="alert">{timingError}</p>}
           <p className="layout-note">Pode ser usado na vertical ou horizontal. O quadro se adapta à tela.</p>
           {error && (
             <div className="startup-error-panel" role="alert">
@@ -293,11 +350,8 @@ export function BlinkAACApp({
             </div>
           )}
           <div className="blink-start-actions">
-            <button className="primary-button" onClick={() => void beginSession(false)} disabled={booting}>
+            <button className="primary-button" onClick={() => void beginSession()} disabled={booting || timingError !== null}>
               {booting ? "Carregando…" : "Iniciar"}
-            </button>
-            <button className="secondary-button" onClick={() => void beginSession(true)} disabled={booting}>
-              Treinar piscadas
             </button>
           </div>
           {onRequestLegacy && <button className="legacy-link" onClick={onRequestLegacy}>abrir interface antiga de gaze</button>}
@@ -305,30 +359,13 @@ export function BlinkAACApp({
         </section>
       )}
 
-      {(screen === "boot" || screen === "training") && (
+      {screen === "boot" && (
         <section className="blink-boot" aria-live="polite">
-          {screen === "boot" ? (
-            <>
-              <p className="eyebrow">iniciando</p>
-              <h2>{startupComplete && waitingForFace ? "Aguardando o rosto…" : currentStartup?.message ?? "Preparando…"}</h2>
-              <p>{startupComplete ? "Fique de frente para a câmera, com boa iluminação no rosto." : "A primeira inicialização pode demorar um pouco."}</p>
-              <StartupChecklist statuses={startupStatuses} />
-              {startupComplete && <p className="tracking-pill tracking-starting">{tracking === "lost" ? "Rosto ainda não detectado" : "Detector pronto · procurando rosto"}</p>}
-            </>
-          ) : (
-            <section className="blink-training" aria-live="polite">
-              <p className="eyebrow">treinamento opcional · etapa {trainingStep + 1} de {BLINK_TRAINING_STEPS.length}</p>
-              <h2>{BLINK_TRAINING_STEPS[trainingStep]}</h2>
-              <p>Este treinamento é informativo. No fim, a navegação começa em SIM.</p>
-              <div className="setup-actions">
-                <button className="primary-button" onClick={() => {
-                  if (trainingStep < BLINK_TRAINING_STEPS.length - 1) setTrainingStep((step) => step + 1);
-                  else activateNavigation();
-                }}>{trainingStep === BLINK_TRAINING_STEPS.length - 1 ? "Ativar navegação" : "Avançar"}</button>
-                <button className="secondary-button" onClick={confirmExit}>Sair</button>
-              </div>
-            </section>
-          )}
+          <p className="eyebrow">iniciando</p>
+          <h2>{startupComplete && waitingForFace ? "Aguardando o rosto…" : currentStartup?.message ?? "Preparando…"}</h2>
+          <p>{startupComplete ? "Fique de frente para a câmera, com boa iluminação no rosto." : "A primeira inicialização pode demorar um pouco."}</p>
+          <StartupChecklist statuses={startupStatuses} />
+          {startupComplete && <p className="tracking-pill tracking-starting">{tracking === "lost" ? "Rosto ainda não detectado" : "Detector pronto · procurando rosto"}</p>}
         </section>
       )}
 
@@ -385,9 +422,9 @@ export function BlinkAACApp({
               <div><dt>pendente 1ª curta</dt><dd>{debugData.pendingShort ? "sim" : "não"}</dd></div>
               <div><dt>2ª em progresso</dt><dd>{debugData.secondBlinkInProgress ? "sim" : "não"}</dd></div>
               <div><dt>cooldown (ms)</dt><dd>{Math.round(debugData.cooldownRemainingMs)}</dd></div>
-              <div><dt>min/longo (ms)</dt><dd>{config.minIntentionalBlinkMs} / {config.longBlinkThresholdMs}</dd></div>
-              <div><dt>janela/re-arm/max (ms)</dt><dd>{config.doubleBlinkWindowMs} / {config.cooldownMs} / {config.maxClosedDurationMs}</dd></div>
-              <div><dt>estabilidade (ms)</dt><dd>{config.stateStabilityMs}</dd></div>
+              <div><dt>min/longo (ms)</dt><dd>{sessionConfig.minIntentionalBlinkMs} / {sessionConfig.longBlinkThresholdMs}</dd></div>
+              <div><dt>janela/re-arm/max (ms)</dt><dd>{sessionConfig.doubleBlinkWindowMs} / {sessionConfig.cooldownMs} / {sessionConfig.maxClosedDurationMs}</dd></div>
+              <div><dt>estabilidade (ms)</dt><dd>{sessionConfig.stateStabilityMs}</dd></div>
               <div><dt>tracking</dt><dd>{tracking}</dd></div>
             </dl>
           )}
