@@ -4,6 +4,7 @@ import type {
   EyeProviderStatusListener,
   EyeStateProvider,
 } from "./eye-types";
+import MediaPipeBlinkWorker from "./mediapipe-blink.worker?worker";
 
 const CAMERA_START_TIMEOUT_MS = 20_000;
 const ENGINE_START_TIMEOUT_MS = 45_000;
@@ -251,7 +252,9 @@ export class MediaPipeBlinkProvider implements EyeStateProvider {
 
   private initializeEngine(modelBuffer: ArrayBuffer): Promise<void> {
     this.report("engine", "active", "Preparando o detector no aparelho…");
-    this.worker = new Worker(new URL("./mediapipe-blink.worker.ts", import.meta.url), { type: "module" });
+    // MediaPipe's WASM bootstrap calls importScripts(), which is forbidden in
+    // module workers. Vite's ?worker constructor emits a classic IIFE worker.
+    this.worker = new MediaPipeBlinkWorker();
 
     return new Promise((resolve, reject) => {
       const worker = this.worker!;
