@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BlinkAACSessionController, conceptLabel, conceptSpeech, type BlinkCommand } from "../communication/blink-session";
 import type { ConceptId } from "../communication/concepts";
 import { DEFAULT_BLINK_CONFIG, type BlinkConfig, type BlinkDetectorSnapshot } from "../gaze/blink-gesture";
-import type { EyeObservation, EyeStateProvider } from "../gaze/eye-types";
+import type { EyeObservation, EyeProviderStartupStatus, EyeProviderStartupStep, EyeStateProvider } from "../gaze/eye-types";
 import { speak } from "../speech/tts";
 
 const BLINK_TRAINING_STEPS = [
@@ -27,6 +27,34 @@ export type BlinkAACProps = {
 
 type Screen = "start" | "boot" | "training" | "board" | "ended";
 
+const STARTUP_STEPS: Array<{ id: EyeProviderStartupStep; label: string }> = [
+  { id: "compatibility", label: "Navegador" },
+  { id: "permission", label: "Permissão" },
+  { id: "camera", label: "Câmera" },
+  { id: "model", label: "Modelo" },
+  { id: "engine", label: "Detector" },
+];
+
+type StartupStatusMap = Partial<Record<EyeProviderStartupStep, EyeProviderStartupStatus>>;
+
+function StartupChecklist({ statuses }: { statuses: StartupStatusMap }) {
+  return (
+    <ol className="startup-checklist" aria-label="Etapas da inicialização">
+      {STARTUP_STEPS.map(({ id, label }) => {
+        const status = statuses[id];
+        return (
+          <li key={id} className={`startup-${status?.state ?? "pending"}`}>
+            <span className="startup-icon" aria-hidden="true">
+              {status?.state === "ready" ? "✓" : status?.state === "error" ? "!" : status?.state === "active" ? "…" : "·"}
+            </span>
+            <span><strong>{label}</strong><small>{status?.message ?? "Aguardando"}</small></span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 export function BlinkAACApp({
   providerFactory,
   config = DEFAULT_BLINK_CONFIG,
@@ -39,6 +67,7 @@ export function BlinkAACApp({
   const sessionRef = useRef<BlinkAACSessionController | null>(null);
   const pulseTimerRef = useRef<number | null>(null);
   const bootingRef = useRef(false);
+  const reportedStartupStepsRef = useRef(new Set<EyeProviderStartupStep>());
   const trainingEnabledRef = useRef(false);
   const applyObservationRef = useRef<(observation: EyeObservation) => void>(() => {});
   const defaultProviderFactoryRef = useRef((() => {
@@ -58,6 +87,7 @@ export function BlinkAACApp({
   const [booting, setBooting] = useState(false);
   const [debugData, setDebugData] = useState<BlinkDetectorSnapshot | null>(null);
   const [diagnosticCount, setDiagnosticCount] = useState(0);
+  const [startupStatuses, setStartupStatuses] = useState<StartupStatusMap>({});
 
   const factory = providerFactory ?? defaultProviderFactoryRef.current;
 
@@ -104,6 +134,8 @@ export function BlinkAACApp({
     setFeedback("");
     setSelected(null);
     setExitArmed(false);
+    reportedStartupStepsRef.current = new Set();
+    setStartupStatuses({});
     trainingEnabledRef.current = training;
     setTrainingStep(0);
     const controller = new BlinkAACSessionController(config);
@@ -119,10 +151,23 @@ export function BlinkAACApp({
     try {
       const provider = factory();
       providerRef.current = provider;
-      await provider.initialize(videoRef.current!);
+      await provider.initialize(videoRef.current!, (status) => {
+        reportedStartupStepsRef.current.add(status.step);
+        setStartupStatuses((current) => ({ ...current, [status.step]: status }));
+      });
+      setStartupStatuses((current) => {
+        const complete = { ...current };
+        for (const { id, label } of STARTUP_STEPS) {
+          if (!reportedStartupStepsRef.current.has(id)) {
+            complete[id] = { step: id, state: "ready", message: `${label} pronto` };
+          }
+        }
+        return complete;
+      });
       provider.start(applyObservation);
     } catch (reason) {
       controller.stop();
+      providerRef.current?.stop();
       providerRef.current = null;
       setError(reason instanceof Error ? reason.message : "Não foi possível iniciar a câmera.");
       setScreen("start");
@@ -222,6 +267,9 @@ export function BlinkAACApp({
   };
 
   const waitingForFace = sessionStage === "waiting" && (screen === "boot" || screen === "board");
+  const startupComplete = STARTUP_STEPS.every(({ id }) => startupStatuses[id]?.state === "ready");
+  const currentStartup = [...STARTUP_STEPS].reverse().map(({ id }) => startupStatuses[id]).find((status) => status?.state === "active" || status?.state === "error");
+  const runtimeFailure = [...STARTUP_STEPS].reverse().map(({ id }) => startupStatuses[id]).find((status) => status?.state === "error");
 
   return (
     <main className={`blink-shell ${screen === "board" ? "is-board" : ""}`}>
@@ -238,7 +286,12 @@ export function BlinkAACApp({
             <li><span className="legend-long">piscada longa</span><span>selecionar</span></li>
           </ul>
           <p className="layout-note">Pode ser usado na vertical ou horizontal. O quadro se adapta à tela.</p>
-          {error && <p className="error-message">{error}</p>}
+          {error && (
+            <div className="startup-error-panel" role="alert">
+              <p className="error-message">{error}</p>
+              <StartupChecklist statuses={startupStatuses} />
+            </div>
+          )}
           <div className="blink-start-actions">
             <button className="primary-button" onClick={() => void beginSession(false)} disabled={booting}>
               {booting ? "Carregando…" : "Iniciar"}
@@ -257,9 +310,10 @@ export function BlinkAACApp({
           {screen === "boot" ? (
             <>
               <p className="eyebrow">iniciando</p>
-              <h2>{waitingForFace ? "Aguardando o rosto…" : "Iniciando a câmera…"}</h2>
-              <p>Fique de frente para a câmera, com boa iluminação no rosto.</p>
-              <p className="tracking-pill tracking-starting">{tracking === "lost" ? "Rosto ainda não detectado" : "Câmera: iniciando"}</p>
+              <h2>{startupComplete && waitingForFace ? "Aguardando o rosto…" : currentStartup?.message ?? "Preparando…"}</h2>
+              <p>{startupComplete ? "Fique de frente para a câmera, com boa iluminação no rosto." : "A primeira inicialização pode demorar um pouco."}</p>
+              <StartupChecklist statuses={startupStatuses} />
+              {startupComplete && <p className="tracking-pill tracking-starting">{tracking === "lost" ? "Rosto ainda não detectado" : "Detector pronto · procurando rosto"}</p>}
             </>
           ) : (
             <section className="blink-training" aria-live="polite">
@@ -281,8 +335,8 @@ export function BlinkAACApp({
       {screen === "board" && (
         <section className="blink-board-session">
           <header className="blink-board-header">
-            <span className={`tracking-pill tracking-${tracking}`} aria-live="polite">
-              {waitingForFace ? "Câmera: aguardando rosto…" : tracking === "ok" ? "Câmera: OK" : "Câmera: perdida"}
+            <span className={`tracking-pill tracking-${runtimeFailure ? "lost" : tracking}`} aria-live="polite" title={runtimeFailure?.message}>
+              {runtimeFailure ? `Falha: ${runtimeFailure.message}` : waitingForFace ? "Modelo OK · aguardando rosto…" : tracking === "ok" ? "Câmera + modelo: OK" : "Modelo OK · rosto perdido"}
             </span>
             <div className="blink-operator-tools">
               {debugOn && <span className="debug-count">{diagnosticCount} evento(s)</span>}

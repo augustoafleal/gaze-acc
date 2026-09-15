@@ -4,7 +4,7 @@ import { act } from "react";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import { BlinkAACApp } from "./blink-aac";
-import type { EyeObservation, EyeStateProvider } from "../gaze/eye-types";
+import type { EyeObservation, EyeProviderStatusListener, EyeStateProvider } from "../gaze/eye-types";
 
 class FakeProvider implements EyeStateProvider {
   readonly name = "fake-blink";
@@ -12,7 +12,9 @@ class FakeProvider implements EyeStateProvider {
   stopped = false;
   initializeCalls = 0;
 
-  async initialize(): Promise<void> {
+  async initialize(_video?: HTMLVideoElement, _onStatus?: EyeProviderStatusListener): Promise<void> {
+    void _video;
+    void _onStatus;
     this.initializeCalls += 1;
   }
 
@@ -27,6 +29,17 @@ class FakeProvider implements EyeStateProvider {
 
   emit(state: EyeObservation["state"], timestampMs: number): void {
     this.listener?.({ state, timestampMs });
+  }
+}
+
+class ModelFailureProvider extends FakeProvider {
+  override async initialize(_video?: HTMLVideoElement, onStatus?: EyeProviderStatusListener): Promise<void> {
+    this.initializeCalls += 1;
+    onStatus?.({ step: "compatibility", state: "ready", message: "Navegador compatível" });
+    onStatus?.({ step: "permission", state: "ready", message: "Permissão concedida" });
+    onStatus?.({ step: "camera", state: "ready", message: "Câmera transmitindo (640×480)" });
+    onStatus?.({ step: "model", state: "error", message: "Falha de rede ao baixar o modelo" });
+    throw new Error("A câmera abriu, mas o modelo de detecção não pôde ser baixado.");
   }
 }
 
@@ -95,6 +108,19 @@ describe("BlinkAACApp start screen", () => {
 });
 
 describe("BlinkAACApp session flow", () => {
+  it("shows which startup stage failed after camera permission was granted", async () => {
+    const provider = new ModelFailureProvider();
+    render(<BlinkAACApp providerFactory={() => provider} speakText={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Iniciar" }));
+
+    expect(await screen.findByText("A câmera abriu, mas o modelo de detecção não pôde ser baixado.")).toBeTruthy();
+    const checklist = screen.getByRole("list", { name: "Etapas da inicialização" });
+    expect(within(checklist).getByText("Permissão concedida")).toBeTruthy();
+    expect(within(checklist).getByText("Câmera transmitindo (640×480)")).toBeTruthy();
+    expect(within(checklist).getByText("Falha de rede ao baixar o modelo")).toBeTruthy();
+    expect(provider.stopped).toBe(true);
+  });
+
   it("initializes the camera on Iniciar and opens the board with SIM focused", async () => {
     const speakText = vi.fn();
     const provider = new FakeProvider();
@@ -108,7 +134,7 @@ describe("BlinkAACApp session flow", () => {
     blink(provider, [["open", 3_000]]);
     expect(await screen.findByRole("button", { name: "SIM" })).toBeTruthy();
     focusedButton("SIM");
-    expect(screen.getByText(/câmera: ok/i)).toBeTruthy();
+    expect(screen.getByText(/câmera \+ modelo: ok/i)).toBeTruthy();
     expect(speakText).not.toHaveBeenCalled();
   });
 
@@ -162,7 +188,7 @@ describe("BlinkAACApp session flow", () => {
     fireEvent.click(screen.getByRole("button", { name: "Iniciar" }));
     await waitFor(() => expect(provider.initializeCalls).toBe(1));
     startBoard(provider);
-    expect(await screen.findByText(/câmera: ok/i)).toBeTruthy();
+    expect(await screen.findByText(/câmera \+ modelo: ok/i)).toBeTruthy();
 
     blink(provider, [
       ["open", 20_000],
@@ -175,7 +201,7 @@ describe("BlinkAACApp session flow", () => {
       ["unavailable", 22_100],
     ]);
 
-    expect(screen.getByText(/câmera: perdida/i)).toBeTruthy();
+    expect(screen.getByText(/modelo ok · rosto perdido/i)).toBeTruthy();
     expect(screen.getByText(/navegação ativa/i)).toBeTruthy();
     focusedButton("SIM");
   });
@@ -198,7 +224,7 @@ describe("BlinkAACApp session flow", () => {
     focusedButton("SIM");
 
     blink(provider, [["open", 55_000]]);
-    expect(await screen.findByText(/câmera: ok/i)).toBeTruthy();
+    expect(await screen.findByText(/câmera \+ modelo: ok/i)).toBeTruthy();
   });
 
   it("keeps a small viewport usable and cancels a partial gesture during resize", async () => {

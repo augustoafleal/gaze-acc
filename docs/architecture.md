@@ -81,10 +81,12 @@ The gaze coordinate contract remains the full CSS viewport: `(0, 0)` is the view
 The current blink interface is a separate camera path from point-of-gaze/dwell:
 
 ```text
-WebEyeTrack -> EyeObservation -> BlinkGestureDetector -> BlinkNavigationController -> AAC UI -> Speech
+Camera -> MediaPipe worker (CPU/WASM) -> EyeObservation -> BlinkGestureDetector -> BlinkNavigationController -> AAC UI -> Speech
 ```
 
-It uses WebEyeTrack only for `facialLandmarks` presence and the `gazeState` eye-state signal. It does not use point-of-gaze, calibration, target hit-testing, gaze cursor or dwell. `EyeObservation` has `state: "open" | "closed" | "unavailable"` and a monotonic `timestampMs`; a closed state is accepted only when facial landmarks are usable. Missing landmarks, invalid results and provider errors become `unavailable`.
+It uses MediaPipe Face Landmarker only for facial-landmark presence and an eye-aspect-ratio eye-state signal. It does not load WebEyeTrack, TensorFlow.js or BlazeGaze and does not use point-of-gaze, calibration, target hit-testing, gaze cursor or dwell. `EyeObservation` has `state: "open" | "closed" | "unavailable"` and a monotonic `timestampMs`; missing landmarks, invalid results and provider errors become `unavailable`.
+
+Startup is an observable contract as well: compatibility, permission, camera frames, model download and local detector initialization are distinct states. Permission success never stands in for a transmitting camera, and model download success never stands in for a runnable detector.
 
 The AAC layer consumes eye observations through `BlinkAACSessionController` (`src/communication/blink-session.ts`), which owns the gesture detector, blink navigation, the command queue and diagnostic events; the UI never touches WebEyeTrack internals. The legacy point-of-gaze/dwell pipeline remains at `?legacy=1` for reference.
 

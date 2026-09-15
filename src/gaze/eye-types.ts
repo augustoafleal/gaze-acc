@@ -5,9 +5,19 @@ export type EyeObservation = {
   timestampMs: number;
 };
 
+export type EyeProviderStartupStep = "compatibility" | "permission" | "camera" | "model" | "engine";
+
+export type EyeProviderStartupStatus = {
+  step: EyeProviderStartupStep;
+  state: "active" | "ready" | "error";
+  message: string;
+};
+
+export type EyeProviderStatusListener = (status: EyeProviderStartupStatus) => void;
+
 export interface EyeStateProvider {
   readonly name: string;
-  initialize(video: HTMLVideoElement): Promise<void>;
+  initialize(video: HTMLVideoElement, onStatus?: EyeProviderStatusListener): Promise<void>;
   start(listener: (observation: EyeObservation) => void): void;
   stop(): void;
 }
