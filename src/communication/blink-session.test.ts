@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { BlinkAACSessionController, conceptLabel, conceptSpeech } from "./blink-session";
+import { DEFAULT_BLINK_CONFIG } from "../gaze/blink-gesture";
 
 const obs = (state: "open" | "closed" | "unavailable", timestampMs: number) => ({ state, timestampMs });
 
@@ -36,6 +37,20 @@ describe("BlinkAACSessionController", () => {
   it("maps a double to a single previous command without advancing first", () => {
     const commands = runBlink([[11, "closed"], [161, "open"], [610, "closed"], [850, "open"]]);
     expect(commands).toEqual([{ kind: "previous", target: "dor" }]);
+  });
+
+  it("maps two short blinks to two next commands when double blink is disabled", () => {
+    const controller = new BlinkAACSessionController({ ...DEFAULT_BLINK_CONFIG, doubleBlinkEnabled: false });
+    controller.start();
+    controller.handleEyeObservation(obs("open", 0));
+    controller.handleEyeObservation(obs("closed", 10));
+    controller.handleEyeObservation(obs("open", 160));
+    controller.handleEyeObservation(obs("closed", 300));
+    controller.handleEyeObservation(obs("open", 450));
+    expect(controller.consumeCommands()).toEqual([
+      { kind: "next", target: "nao" },
+      { kind: "next", target: "virar" },
+    ]);
   });
 
   it("maps a long to a single select command and keeps the focus", () => {

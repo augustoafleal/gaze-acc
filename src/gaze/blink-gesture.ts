@@ -4,6 +4,7 @@ export const DEFAULT_BLINK_CONFIG = {
   minIntentionalBlinkMs: 120,
   longBlinkThresholdMs: 700,
   doubleBlinkWindowMs: 450,
+  doubleBlinkEnabled: true,
   cooldownMs: 800,
   maxClosedDurationMs: 5_000,
   stateStabilityMs: 0,
@@ -13,6 +14,7 @@ export type BlinkConfig = {
   minIntentionalBlinkMs: number;
   longBlinkThresholdMs: number;
   doubleBlinkWindowMs: number;
+  doubleBlinkEnabled: boolean;
   cooldownMs: number;
   maxClosedDurationMs: number;
   /** Minimum time a new open/closed observation must stay consistent before the
@@ -294,6 +296,19 @@ export class BlinkGestureDetector {
             closedDurationMs: durationMs,
           }));
         } else if (classification === "short") {
+          if (!this.config.doubleBlinkEnabled) {
+            const event = this.emit("short", nowMs, durationMs);
+            if (event) gestures.push(event);
+            diagnostics.push(this.diag("short_committed", nowMs, {
+              classification: event ? "short" : "ignored",
+              closedDurationMs: durationMs,
+            }));
+            diagnostics.push(this.diag("eye_opened", nowMs, {
+              classification: event ? "short" : "ignored",
+              closedDurationMs: durationMs,
+            }));
+            return { gestures, diagnostics };
+          }
           this.firstBlinkCompletedAtMs = atMs;
           this.firstBlinkDurationMs = durationMs;
           diagnostics.push(this.diag("short_candidate", nowMs, {
@@ -368,6 +383,7 @@ export class BlinkGestureDetector {
   }
 
   private expirePendingShort(nowMs: number): BlinkDetectorUpdate {
+    if (!this.config.doubleBlinkEnabled) return { gestures: [], diagnostics: [] };
     if (this.firstBlinkCompletedAtMs === null || this.secondBlinkInProgress) {
       return { gestures: [], diagnostics: [] };
     }
@@ -392,7 +408,7 @@ export class BlinkGestureDetector {
   }
 
   private doubleWindowDeadlineMs(): number | null {
-    return this.firstBlinkCompletedAtMs === null
+    return !this.config.doubleBlinkEnabled || this.firstBlinkCompletedAtMs === null
       ? null
       : this.firstBlinkCompletedAtMs + this.config.doubleBlinkWindowMs;
   }

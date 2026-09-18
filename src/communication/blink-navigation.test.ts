@@ -34,4 +34,33 @@ describe("BlinkNavigationController", () => {
     const events = ["short", "double", "long"].map((gesture) => controller.handleGesture(gesture as "short" | "double" | "long"));
     expect(events.map((event) => event.command)).toEqual(["next", "previous", "select"]);
   });
+
+  it("navigates any valid active card collection with wrap-around", () => {
+    const controller = new BlinkNavigationController([
+      { id: "agua", label: "ÁGUA", speech: "Água" },
+      { id: "ajuda", label: "AJUDA", speech: "Preciso de ajuda" },
+    ]);
+    expect(controller.currentTarget).toBe("agua");
+    expect(controller.handleGesture("short").target).toBe("ajuda");
+    expect(controller.handleGesture("short").target).toBe("agua");
+    expect(controller.handleGesture("double").target).toBe("ajuda");
+  });
+
+  it.each([1, 2, 4, 8, 9, 10])("supports %i cards", (count) => {
+    const cards = Array.from({ length: count }, (_, index) => ({ id: `card-${index}`, label: `CARD ${index}`, speech: `Card ${index}` }));
+    const controller = new BlinkNavigationController(cards);
+    for (let index = 0; index < count; index += 1) controller.handleGesture("short");
+    expect(controller.currentTarget).toBe("card-0");
+    expect(controller.handleGesture("double").target).toBe(`card-${count - 1}`);
+  });
+
+  it("wraps and selects correctly with ten cards", () => {
+    const cards = Array.from({ length: 10 }, (_, index) => ({ id: `card-${index}`, label: `CARD ${index}`, speech: `Card ${index}` }));
+    const controller = new BlinkNavigationController(cards);
+    for (let index = 0; index < 9; index += 1) controller.handleGesture("short");
+    expect(controller.currentTarget).toBe("card-9");
+    expect(controller.handleGesture("short").target).toBe("card-0");
+    expect(controller.handleGesture("double").target).toBe("card-9");
+    expect(controller.handleGesture("long")).toMatchObject({ command: "select", target: "card-9" });
+  });
 });

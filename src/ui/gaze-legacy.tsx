@@ -311,9 +311,9 @@ export function GazeAACApp() {
       }
 
       const event = blinkNavigationRef.current.handleGesture(gesture.gesture);
-      setBlinkFocusedTarget(event.target);
+      setBlinkFocusedTarget(event.target as ConceptId);
       if (event.command === "select") {
-        setLastSelection(event.target);
+        setLastSelection(event.target as ConceptId);
         setBlinkFeedback(`Selecionado: ${CONCEPTS.find((concept) => concept.id === event.target)?.label ?? event.target}`);
         speak(CONCEPTS.find((concept) => concept.id === event.target)?.speech ?? event.target);
       } else {

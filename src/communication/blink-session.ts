@@ -1,4 +1,4 @@
-import { CONCEPTS, type ConceptId } from "./concepts";
+import { DEFAULT_COMMUNICATION_CARDS, type CommunicationCard } from "./concepts";
 import { BlinkNavigationController } from "./blink-navigation";
 import {
   BlinkGestureDetector,
@@ -15,14 +15,14 @@ export type BlinkTrackingStatus = "starting" | "ok" | "lost";
 export type BlinkSessionStage = "waiting" | "active";
 
 export type BlinkCommand =
-  | { kind: "next"; target: ConceptId }
-  | { kind: "previous"; target: ConceptId }
-  | { kind: "select"; target: ConceptId };
+  | { kind: "next"; target: string }
+  | { kind: "previous"; target: string }
+  | { kind: "select"; target: string };
 
 export type BlinkSessionView = {
   stage: BlinkSessionStage;
   tracking: BlinkTrackingStatus;
-  focused: ConceptId;
+  focused: string;
   lastGesture: BlinkGesture | null;
   diagnosticCount: number;
 };
@@ -33,6 +33,7 @@ function newSessionId(): string {
 
 export class BlinkAACSessionController {
   readonly config: BlinkConfig;
+  readonly cards: readonly CommunicationCard[];
 
   private detector: BlinkGestureDetector;
   private navigation: BlinkNavigationController;
@@ -46,10 +47,11 @@ export class BlinkAACSessionController {
   private startedAt = "";
   private finishedAt: string | null = null;
 
-  constructor(config: BlinkConfig = DEFAULT_BLINK_CONFIG) {
+  constructor(config: BlinkConfig = DEFAULT_BLINK_CONFIG, cards: readonly CommunicationCard[] = DEFAULT_COMMUNICATION_CARDS) {
     this.config = config;
+    this.cards = cards;
     this.detector = new BlinkGestureDetector(config);
-    this.navigation = new BlinkNavigationController();
+    this.navigation = new BlinkNavigationController(cards);
   }
 
   get isActive(): boolean {
@@ -72,7 +74,7 @@ export class BlinkAACSessionController {
 
   start(): void {
     this.detector = new BlinkGestureDetector(this.config);
-    this.navigation = new BlinkNavigationController();
+    this.navigation = new BlinkNavigationController(this.cards);
     this.events = [];
     this.pendingCommands = [];
     this.lastGesture = null;
@@ -85,7 +87,7 @@ export class BlinkAACSessionController {
   }
 
   navToStart(): void {
-    this.navigation = new BlinkNavigationController();
+    this.navigation = new BlinkNavigationController(this.cards);
   }
 
   handleEyeObservation(observation: EyeObservation): void {
@@ -169,10 +171,10 @@ export class BlinkAACSessionController {
   }
 }
 
-export function conceptLabel(id: ConceptId): string {
-  return CONCEPTS.find((concept) => concept.id === id)?.label ?? id;
+export function conceptLabel(id: string, cards: readonly CommunicationCard[] = DEFAULT_COMMUNICATION_CARDS): string {
+  return cards.find((concept) => concept.id === id)?.label ?? id;
 }
 
-export function conceptSpeech(id: ConceptId): string {
-  return CONCEPTS.find((concept) => concept.id === id)?.speech ?? id;
+export function conceptSpeech(id: string, cards: readonly CommunicationCard[] = DEFAULT_COMMUNICATION_CARDS): string {
+  return cards.find((concept) => concept.id === id)?.speech ?? id;
 }

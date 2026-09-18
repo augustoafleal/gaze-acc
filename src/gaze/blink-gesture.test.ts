@@ -53,6 +53,21 @@ describe("BlinkGestureDetector", () => {
     expect(update.diagnostics.at(-1)?.classification).toBe("short");
   });
 
+  it("emits SHORT immediately and never creates DOUBLE when double blink is disabled", () => {
+    const instance = detector({ doubleBlinkEnabled: false, doubleBlinkWindowMs: 300 });
+    open(instance, 0);
+    expect(blink(instance, 100, 220).gestures).toEqual([{ gesture: "short", timestampMs: 220, closedDurationMs: 120 }]);
+    expect(instance.snapshot(220).pendingShort).toBe(false);
+    expect(blink(instance, 300, 420).gestures).toEqual([{ gesture: "short", timestampMs: 420, closedDurationMs: 120 }]);
+    expect(instance.snapshot(420).lastGesture).toBe("short");
+  });
+
+  it("keeps the long threshold unchanged when double blink is disabled", () => {
+    const instance = detector({ doubleBlinkEnabled: false });
+    open(instance, 0);
+    expect(blink(instance, 100, 800).gestures).toMatchObject([{ gesture: "long", closedDurationMs: 700 }]);
+  });
+
   it("emits double without emitting the pending short first", () => {
     const instance = detector();
     open(instance, 0);
