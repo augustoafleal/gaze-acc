@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { BlinkAACSessionController, conceptLabel, conceptSpeech, type BlinkCommand } from "../communication/blink-session";
-import type { ConceptId } from "../communication/concepts";
+import { defaultCommunicationCards, type CommunicationCard } from "../communication/concepts";
+import { loadPreferences, MAX_COMMUNICATION_CARDS, newCardId, savePreferences, validCards, type BlinkTimingPreferences, type Preferences } from "../communication/preferences";
 import { DEFAULT_BLINK_CONFIG, type BlinkConfig, type BlinkDetectorSnapshot } from "../gaze/blink-gesture";
 import type { EyeObservation, EyeProviderStartupStatus, EyeProviderStartupStep, EyeStateProvider } from "../gaze/eye-types";
 import { speak } from "../speech/tts";
 
-function formatCommand(command: BlinkCommand): string {
-  if (command.kind === "select") return `Selecionado: ${conceptLabel(command.target)}`;
-  return `${command.kind === "next" ? "Próximo" : "Anterior"}: ${conceptLabel(command.target)}`;
+function formatCommand(command: BlinkCommand, cards: readonly CommunicationCard[]): string {
+  if (command.kind === "select") return `Selecionado: ${conceptLabel(command.target, cards)}`;
+  return `${command.kind === "next" ? "Próximo" : "Anterior"}: ${conceptLabel(command.target, cards)}`;
 }
 
 export type BlinkAACProps = {
@@ -19,9 +20,9 @@ export type BlinkAACProps = {
   onRequestLegacy?: () => void;
 };
 
-type Screen = "start" | "boot" | "board" | "ended";
+type Screen = "start" | "cards" | "boot" | "board" | "ended";
 
-type BlinkTimingSettings = Pick<BlinkConfig, "minIntentionalBlinkMs" | "longBlinkThresholdMs" | "doubleBlinkWindowMs">;
+type BlinkTimingSettings = BlinkTimingPreferences;
 type BlinkTimingDraft = Record<keyof BlinkTimingSettings, string>;
 
 function parseTimingDraft(settings: BlinkTimingDraft): BlinkTimingSettings | null {
@@ -42,7 +43,7 @@ function parseTimingDraft(settings: BlinkTimingDraft): BlinkTimingSettings | nul
 function timingValidationMessage(settings: BlinkTimingDraft, maxClosedDurationMs: number): string | null {
   if (!settings.minIntentionalBlinkMs.trim()) return "Informe a duração mínima da piscada.";
   if (!settings.longBlinkThresholdMs.trim()) return "Informe a duração da piscada longa.";
-  if (!settings.doubleBlinkWindowMs.trim()) return "Informe a janela da piscada dupla.";
+  if (!settings.doubleBlinkWindowMs.trim()) return "Informe a janela entre duas piscadas.";
   const parsed = parseTimingDraft(settings);
   if (!parsed) return "Use apenas números válidos nos ajustes de piscada.";
   if (parsed.minIntentionalBlinkMs < 50 || parsed.minIntentionalBlinkMs > 2_000) {
@@ -56,9 +57,21 @@ function timingValidationMessage(settings: BlinkTimingDraft, maxClosedDurationMs
     return `A piscada longa não pode ultrapassar ${maxClosedDurationMs} ms.`;
   }
   if (parsed.doubleBlinkWindowMs < 100 || parsed.doubleBlinkWindowMs > 3_000) {
-    return "A janela da piscada dupla deve ficar entre 100 e 3000 ms.";
+    return "A janela entre duas piscadas deve ficar entre 100 e 3000 ms.";
   }
   return null;
+}
+
+function clonePreferences(preferences: Preferences): Preferences {
+  return {
+    ...preferences,
+    timing: { ...preferences.timing },
+    cards: preferences.cards.map((card) => ({ ...card })),
+  };
+}
+
+function preferencesSignature(preferences: Preferences): string {
+  return JSON.stringify(preferences);
 }
 
 const STARTUP_STEPS: Array<{ id: EyeProviderStartupStep; label: string }> = [
@@ -103,6 +116,7 @@ export function BlinkAACApp({
   const bootingRef = useRef(false);
   const reportedStartupStepsRef = useRef(new Set<EyeProviderStartupStep>());
   const applyObservationRef = useRef<(observation: EyeObservation) => void>(() => {});
+  const sessionCardsRef = useRef<CommunicationCard[]>([]);
   const defaultProviderFactoryRef = useRef((() => {
     throw new Error("No blink eye-state provider was configured.");
   }) as () => EyeStateProvider);
@@ -120,18 +134,72 @@ export function BlinkAACApp({
   const [debugData, setDebugData] = useState<BlinkDetectorSnapshot | null>(null);
   const [diagnosticCount, setDiagnosticCount] = useState(0);
   const [startupStatuses, setStartupStatuses] = useState<StartupStatusMap>({});
+  const [preferences, setPreferences] = useState(() => loadPreferences(config));
   const [timingSettings, setTimingSettings] = useState<BlinkTimingDraft>(() => ({
-    minIntentionalBlinkMs: String(config.minIntentionalBlinkMs),
-    longBlinkThresholdMs: String(config.longBlinkThresholdMs),
-    doubleBlinkWindowMs: String(config.doubleBlinkWindowMs),
+    minIntentionalBlinkMs: String(preferences.timing.minIntentionalBlinkMs),
+    longBlinkThresholdMs: String(preferences.timing.longBlinkThresholdMs),
+    doubleBlinkWindowMs: String(preferences.timing.doubleBlinkWindowMs),
   }));
+  const [doubleBlinkEnabled, setDoubleBlinkEnabled] = useState(() => preferences.doubleBlinkEnabled);
+  const [cards, setCards] = useState<CommunicationCard[]>(() => preferences.cards.map((card) => ({ ...card })));
+  const [sessionCards, setSessionCards] = useState<CommunicationCard[]>(() => preferences.cards.map((card) => ({ ...card })));
   const [sessionConfig, setSessionConfig] = useState<BlinkConfig>(config);
+  const preferencesRef = useRef(preferences);
+  const persistedSignatureRef = useRef(preferencesSignature(preferences));
 
   const factory = providerFactory ?? defaultProviderFactoryRef.current;
   const timingError = timingValidationMessage(timingSettings, config.maxClosedDurationMs);
+  const parsedTiming = useMemo(() => parseTimingDraft(timingSettings), [timingSettings]);
+  const validDraftPreferences = useMemo(() => parsedTiming && timingError === null && validCards(cards)
+    ? {
+      schemaVersion: 1 as const,
+      timing: parsedTiming,
+      doubleBlinkEnabled,
+      cards: cards.map((card) => ({ ...card })),
+    }
+    : null, [cards, doubleBlinkEnabled, parsedTiming, timingError]);
+  const draftSignature = validDraftPreferences ? preferencesSignature(validDraftPreferences) : null;
+
+  const persistPreferences = useCallback((next: Preferences) => {
+    const snapshot = clonePreferences(next);
+    preferencesRef.current = snapshot;
+    persistedSignatureRef.current = preferencesSignature(snapshot);
+    setPreferences(snapshot);
+    savePreferences(snapshot, config.maxClosedDurationMs);
+  }, [config.maxClosedDurationMs]);
+
+  useEffect(() => {
+    if (!validDraftPreferences || !draftSignature || draftSignature === persistedSignatureRef.current) return;
+    const timeout = window.setTimeout(() => persistPreferences(validDraftPreferences), 400);
+    return () => window.clearTimeout(timeout);
+  }, [draftSignature, persistPreferences, validDraftPreferences]);
 
   const updateTiming = (field: keyof BlinkTimingSettings, value: string) => {
     setTimingSettings((current) => ({ ...current, [field]: value }));
+  };
+
+  const persistDiscreteChange = (nextCards: CommunicationCard[], nextDoubleBlinkEnabled = doubleBlinkEnabled) => {
+    const timing = parsedTiming && timingError === null ? parsedTiming : preferencesRef.current.timing;
+    const persistedCards = validCards(nextCards) ? nextCards : preferencesRef.current.cards;
+    persistPreferences({
+      schemaVersion: 1,
+      timing: { ...timing },
+      doubleBlinkEnabled: nextDoubleBlinkEnabled,
+      cards: persistedCards.map((card) => ({ ...card })),
+    });
+  };
+
+  const updateCard = (id: string, field: "label" | "speech", value: string) => {
+    setCards((current) => current.map((card) => card.id === id ? { ...card, [field]: value } : card));
+  };
+
+  const moveCard = (index: number, offset: -1 | 1) => {
+    const destination = index + offset;
+    if (destination < 0 || destination >= cards.length) return;
+    const next = [...cards];
+    [next[index], next[destination]] = [next[destination], next[index]];
+    setCards(next);
+    persistDiscreteChange(next);
   };
 
   const applyObservation = useCallback((observation: EyeObservation) => {
@@ -143,14 +211,14 @@ export function BlinkAACApp({
     setTracking(view.tracking);
     setDiagnosticCount(view.diagnosticCount);
 
-    let pulse: ConceptId | null = null;
+    let pulse: string | null = null;
     for (const command of controller.consumeCommands()) {
       setFocused(command.target);
-      setFeedback(formatCommand(command));
+      setFeedback(formatCommand(command, sessionCardsRef.current));
       if (command.kind === "select") pulse = command.target;
     }
     if (pulse !== null) {
-      speakText(conceptSpeech(pulse));
+      speakText(conceptSpeech(pulse, sessionCardsRef.current));
       setSelected(pulse);
       if (pulseTimerRef.current !== null) window.clearTimeout(pulseTimerRef.current);
       pulseTimerRef.current = window.setTimeout(() => setSelected(null), 700);
@@ -170,8 +238,7 @@ export function BlinkAACApp({
   }, []);
 
   const beginSession = useCallback(async () => {
-    const parsedTimingSettings = parseTimingDraft(timingSettings);
-    if (bootingRef.current || timingValidationMessage(timingSettings, config.maxClosedDurationMs) || !parsedTimingSettings) return;
+    if (bootingRef.current || timingError || !parsedTiming || !validCards(cards)) return;
     bootingRef.current = true;
     setBooting(true);
     setError(null);
@@ -181,9 +248,16 @@ export function BlinkAACApp({
     setExitArmed(false);
     reportedStartupStepsRef.current = new Set();
     setStartupStatuses({});
-    const configuredSession = { ...config, ...parsedTimingSettings };
+    const configuredSession = {
+      ...config,
+      ...parsedTiming,
+      doubleBlinkEnabled,
+    };
     setSessionConfig(configuredSession);
-    const controller = new BlinkAACSessionController(configuredSession);
+    const configuredCards = cards.map((card) => ({ ...card }));
+    sessionCardsRef.current = configuredCards;
+    setSessionCards(configuredCards);
+    const controller = new BlinkAACSessionController(configuredSession, configuredCards);
     sessionRef.current = controller;
     controller.start();
     setScreen("boot");
@@ -219,7 +293,7 @@ export function BlinkAACApp({
     }
     bootingRef.current = false;
     setBooting(false);
-  }, [applyObservation, config, factory, timingSettings]);
+  }, [applyObservation, cards, config, doubleBlinkEnabled, factory, parsedTiming, timingError]);
 
   useEffect(() => {
     if (sessionStage === "active" && screen === "boot") {
@@ -320,7 +394,7 @@ export function BlinkAACApp({
           <p className="blink-start-instruction">Use piscadas para navegar e selecionar.</p>
           <ul className="blink-legend" aria-label="Como usar">
             <li><span className="legend-short">piscada curta</span><span>próximo</span></li>
-            <li><span className="legend-double">duas piscadas curtas</span><span>anterior</span></li>
+            {doubleBlinkEnabled && <li><span className="legend-double">duas piscadas curtas</span><span>anterior</span></li>}
             <li><span className="legend-long">piscada longa</span><span>selecionar</span></li>
           </ul>
           <fieldset className="blink-timing-settings">
@@ -336,12 +410,14 @@ export function BlinkAACApp({
               <small>A partir disso, seleciona</small>
             </label>
             <label>
-              <span>Janela da dupla</span>
-              <span className="timing-input"><input type="number" aria-label="Janela da piscada dupla (ms)" min="100" max="3000" step="50" value={timingSettings.doubleBlinkWindowMs} onChange={(event) => updateTiming("doubleBlinkWindowMs", event.currentTarget.value)} /><small>ms</small></span>
-              <small>Tempo para a 2ª piscada</small>
+              <span>Janela dupla</span>
+              <span className="timing-input"><input type="number" aria-label="Janela da piscada dupla (ms)" min="100" max="3000" step="10" value={timingSettings.doubleBlinkWindowMs} disabled={!doubleBlinkEnabled} onChange={(event) => updateTiming("doubleBlinkWindowMs", event.currentTarget.value)} /><small>ms</small></span>
+              <small>Tempo para a segunda piscada</small>
             </label>
           </fieldset>
+          <label className="double-blink-toggle"><input type="checkbox" checked={doubleBlinkEnabled} onChange={(event) => { const next = event.currentTarget.checked; setDoubleBlinkEnabled(next); persistDiscreteChange(cards, next); }} /> <span><strong>Usar duas piscadas para voltar</strong><small>{doubleBlinkEnabled ? "Uma piscada curta aguarda brevemente por uma segunda." : "Cada piscada curta avança imediatamente."}</small></span></label>
           {timingError && <p className="timing-error" role="alert">{timingError}</p>}
+          {!validCards(cards) && <p className="timing-error" role="alert">Revise os cards antes de iniciar.</p>}
           <p className="layout-note">Pode ser usado na vertical ou horizontal. O quadro se adapta à tela.</p>
           {error && (
             <div className="startup-error-panel" role="alert">
@@ -350,12 +426,33 @@ export function BlinkAACApp({
             </div>
           )}
           <div className="blink-start-actions">
-            <button className="primary-button" onClick={() => void beginSession()} disabled={booting || timingError !== null}>
+            <button className="secondary-button" onClick={() => setScreen("cards")}>Configurar cards ({cards.length})</button>
+            <button className="primary-button" onClick={() => void beginSession()} disabled={booting || timingError !== null || !validCards(cards)}>
               {booting ? "Carregando…" : "Iniciar"}
             </button>
           </div>
           {onRequestLegacy && <button className="legacy-link" onClick={onRequestLegacy}>abrir interface antiga de gaze</button>}
           <p className="privacy-note">O vídeo nunca sai do aparelho e não é salvo. As piscadas controlam apenas os lembretes acima.</p>
+        </section>
+      )}
+
+      {screen === "cards" && (
+        <section className="blink-start card-settings" aria-live="polite">
+          <p className="eyebrow">configuração</p>
+          <h2>Cards de comunicação</h2>
+          <p className="blink-start-instruction">Edite o texto exibido e a frase falada. A ordem define a navegação.</p>
+          <div className="card-editor-list">
+            {cards.map((card, index) => (
+              <fieldset className="card-editor" key={card.id}>
+                <legend>Card {index + 1}</legend>
+                <label>Texto do card<input aria-label={`Texto do card ${index + 1}`} value={card.label} onChange={(event) => updateCard(card.id, "label", event.currentTarget.value)} /></label>
+                <label>Texto falado<input aria-label={`Texto falado do card ${index + 1}`} value={card.speech} onChange={(event) => updateCard(card.id, "speech", event.currentTarget.value)} /></label>
+                <div className="card-editor-actions"><button className="secondary-button compact" onClick={() => moveCard(index, -1)} disabled={index === 0}>Subir</button><button className="secondary-button compact" onClick={() => moveCard(index, 1)} disabled={index === cards.length - 1}>Descer</button><button className="secondary-button compact" onClick={() => { const next = cards.filter((item) => item.id !== card.id); setCards(next); persistDiscreteChange(next); }} disabled={cards.length === 1}>Remover</button></div>
+              </fieldset>
+          ))}
+          </div>
+          {!validCards(cards) && <p className="timing-error" role="alert">Cada card precisa de texto exibido e texto falado.</p>}
+          <div className="blink-start-actions"><button className="secondary-button" onClick={() => { if (cards.length >= MAX_COMMUNICATION_CARDS) return; const next = [...cards, { id: newCardId(cards), label: "NOVO CARD", speech: "Novo card" }]; setCards(next); persistDiscreteChange(next); }} disabled={cards.length >= MAX_COMMUNICATION_CARDS}>Adicionar card</button><button className="secondary-button" onClick={() => { const next = defaultCommunicationCards(); setCards(next); persistDiscreteChange(next); }}>Restaurar cards padrão</button><button className="secondary-button" onClick={() => setScreen("start")}>Voltar</button></div>
         </section>
       )}
 
@@ -381,22 +478,22 @@ export function BlinkAACApp({
             </div>
           </header>
 
-          <div className="blink-board">
-            {(["sim", "nao", "virar", "dor"] as const).map((id) => (
+          <div className="blink-board" data-card-count={sessionCards.length}>
+            {sessionCards.map((card) => (
               <button
-                key={id}
-                className={`concept-target target-${id} ${focused === id ? "is-blink-focused" : ""} ${selected === id ? "is-selected" : ""}`}
-                aria-label={conceptLabel(id)}
+                key={card.id}
+                className={`concept-target ${focused === card.id ? "is-blink-focused" : ""} ${selected === card.id ? "is-selected" : ""}`}
+                aria-label={card.label}
                 onClick={(event) => event.preventDefault()}
               >
-                <span>{conceptLabel(id)}</span>
-                {focused === id && <span className="blink-focus-indicator" aria-hidden="true">Foco</span>}
+                <span>{card.label}</span>
+                {focused === card.id && <span className="blink-focus-indicator" aria-hidden="true">Foco</span>}
               </button>
             ))}
           </div>
 
           <footer className="blink-board-footer">
-            <p className="selection-feedback" aria-live="polite">{feedback || "Navegação ativa. SIM é o item inicial."}</p>
+            <p className="selection-feedback" aria-live="polite">{feedback || `Navegação ativa. ${sessionCards[0]?.label ?? "Card"} é o item inicial.`}</p>
           </footer>
 
           {exitArmed && (

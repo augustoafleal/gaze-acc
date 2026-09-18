@@ -24,9 +24,9 @@ Core principles:
 The default application is a single-purpose blink communicator for the human test:
 
 - start screen that explains the three gestures;
-- camera session with three adjustable blink timings on the start screen;
-- four large, fixed targets: `SIM`, `NÃO`, `VIRAR`, `DOR`;
-- short blink = next, double short blink = previous, long blink = select;
+- camera session with adjustable minimum, long-blink and double-window timings on the start screen;
+- configurable communication cards, initially `SIM`, `NÃO`, `VIRAR`, `DOR`;
+- optional double short blink = previous; short blink = next; long blink = select;
 - dwell selection is replaced by a long blink, but the underlying dwell and blink gesture modules remain in the repository;
 - TTS speech output exactly once per selection;
 - local JSON diagnostic export (durations and eye-state events only — never video or landmarks).
@@ -37,29 +37,39 @@ Do not start with a full keyboard, word prediction, profiles, cloud sync, or a b
 
 ## Run locally
 
-```bash
-npm install
-npm run dev
-```
+Requirements: Node.js/npm and the `cloudflared` command available in the terminal.
 
-The app renders the blink communicator by default. To start development:
+For local development, run the following in Terminal 1:
 
 ```bash
 npm install
-npm run dev
-```
-
-To test from another device through a temporary HTTPS URL, keep the development
-server and Cloudflare tunnel in separate terminals:
-
-```bash
 npm run dev -- --host 0.0.0.0
+```
+
+The Vite server normally starts at `http://localhost:5173`. To test the camera
+from a phone or tablet, keep that terminal open and run the tunnel in Terminal 2:
+
+```bash
 cloudflared tunnel --url http://localhost:5173
 ```
 
+The tunnel prints a temporary `https://*.trycloudflare.com` address. Open that
+HTTPS address on the test device and allow camera access when prompted. The
+development server and the tunnel must remain running during the test.
+
+If Vite reports that port `5173` is already in use, it chooses another port
+(for example, `5175`). Use the port shown by Vite in the tunnel command instead:
+
+```bash
+cloudflared tunnel --url http://localhost:5175
+```
+
+The app renders the blink communicator by default. Add `?legacy=1` to the
+address to open the preserved gaze/dwell interface.
+
 The default blink path self-hosts the pinned MediaPipe WASM runtime and downloads only the official 3.6 MB Face Landmarker model. Its startup screen reports browser compatibility, permission, a real camera frame, model download and detector initialization separately. Set `VITE_FACE_LANDMARKER_MODEL_URL` at build time to self-host the model as well.
 
-In the blink app, the start screen exposes the minimum intentional blink, long-blink threshold, and double-blink window, prefilled with the experimental defaults. `Iniciar` opens the camera and, once the face is tracked, the four-target board with `SIM` focused. Short blink advances focus, two short blinks move it back, long blink selects and speaks. If tracking is lost the board keeps its focus and no commands are accepted until the face is detected again. Phones, tablets and notebooks support both portrait and landscape without a minimum-viewport lock; the fixed 2×2 board remains scroll-free and cancels only an incomplete blink gesture if the viewport changes.
+In the blink app, the start screen exposes the minimum intentional blink, long-blink threshold and double-blink window, prefilled with the experimental defaults. Valid edits are saved automatically only in the current browser/device; temporary invalid input remains editable without replacing the last valid preference. The `Usar duas piscadas para voltar` toggle saves immediately. Its window remains visible and preserved when the toggle is off, but is disabled because it does not apply; in that mode, each short blink advances immediately. A separate card editor can add, edit, order, remove and restore up to ten communication cards, with valid changes saved automatically. `Iniciar` uses a snapshot of the current valid configuration for that session. Long blink selects and speaks. If tracking is lost the board keeps its focus and no commands are accepted until the face is detected again. Phones, tablets and notebooks support both portrait and landscape without a minimum-viewport lock; the board remains scroll-free and cancels only an incomplete blink gesture if the viewport changes.
 
 Add `?legacy=1` to the URL to reach the previous dwell/gaze interface (calibration, free mode, pointer test mode, and the guided experiment). That interface is preserved for reference; it is not the product flow. The optional blink index in the legacy UI and the old `?blinkSynthetic` hook remain available for development only.
 
